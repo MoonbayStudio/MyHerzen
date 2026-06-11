@@ -1,0 +1,15 @@
+slowapi
+fastapi
+uvicorn[standard]
+requests
+google-auth
+python-jose
+cryptography
+pydantic
+sqlalchemy
+psycopg2-binary
+PyJWT
+bcrypt
+httpx
+dateparser
+tzdata

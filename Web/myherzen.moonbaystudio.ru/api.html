@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MyHerzen API</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page-bg"></div>
+
+  <header class="top-nav">
+    <div class="top-nav-inner">
+      <a class="brand-button" href="https://moonbaystudio.ru/" aria-label="Moonbay Studio">
+        <img src="img/logo.png" alt="Moonbay Studio">
+      </a>
+
+      <nav class="top-nav-actions" aria-label="Навигация">
+        <a class="nav-pill" href="news">Новости</a>
+        <a class="nav-pill" href="contacts">Контакты</a>
+        <a class="nav-pill" href="account#register" data-auth-link="guest">Регистрация</a>
+        <a class="nav-pill" href="account#login" data-auth-link="guest">Вход</a>
+        <a class="nav-pill" href="account" data-auth-link="account" hidden>Аккаунт</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero-card">
+      <div class="hero-copy">
+        <span class="badge">Отдельная страница API</span>
+        <h1>MyHerzen API</h1>
+        <p>База для описания REST API приложения. Ты сможешь дописать endpoint-ы и схемы ответов.</p>
+      </div>
+
+      <div class="hero-stats">
+        <article class="stat-card">
+          <span class="stat-label">Версия</span>
+          <strong class="stat-value">v1</strong>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Формат</span>
+          <strong class="stat-value">JSON</strong>
+        </article>
+        <article class="stat-card wide">
+          <span class="stat-label">Базовый URL</span>
+          <strong class="stat-value small">https://api.myherzen.app/</strong>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel section-panel">
+      <div class="section-head">
+        <h2>Эндпоинты</h2>
+      </div>
+      <div class="news-list">
+        <article class="news-item">
+          <h3>GET /profile</h3>
+          <p>Плейсхолдер для описания структуры ответа профиля.</p>
+        </article>
+        <article class="news-item">
+          <h3>GET /schedule</h3>
+          <p>Плейсхолдер для описания расписания и параметров запроса.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-left">
+        <strong>MyHerzen</strong>
+        <span>Приложение для iOS и Mac</span>
+      </div>
+
+      <div class="footer-links">
+        <a href="api">API</a>
+        <a href="terms">Правила использования</a>
+        <a href="contacts">Контакты</a>
+      </div>
+
+      <div class="footer-right">
+        <span>© 2026 MyHerzen</span>
+      </div>
+    </div>
+  </footer>
+  <script src="auth.js"></script>
+  <script src="nav.js"></script>
+</body>
+</html>

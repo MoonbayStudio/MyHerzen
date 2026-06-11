@@ -1,0 +1,120 @@
+# =========================
+# macOS
+# =========================
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# =========================
+# Editors
+# =========================
+.vscode/
+
+.idea/
+*.iml
+
+# =========================
+# Python
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*$py.class
+
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+venv/
+.venv/
+env/
+
+.coverage
+htmlcov/
+
+# =========================
+# Environment & Secrets
+# =========================
+.env
+.env.*
+!.env.example
+
+modules.flags.env
+
+*.pem
+*.key
+*.p12
+*.mobileprovision
+
+GoogleService-Info.plist
+google-services.json
+client_*.plist
+
+# =========================
+# Logs
+# =========================
+*.log
+*.pid
+
+# =========================
+# Docker
+# =========================
+docker-data/
+
+# =========================
+# Android
+# =========================
+Android/.gradle/
+Android/build/
+Android/app/build/
+
+Android/local.properties
+
+Android/captures/
+Android/.externalNativeBuild/
+Android/.cxx/
+
+# =========================
+# iOS / Xcode
+# =========================
+DerivedData/
+.build/
+.swiftpm/
+
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+
+iOS/build/
+
+# =========================
+# Fastlane
+# =========================
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+
+# =========================
+# Web / Node
+# =========================
+node_modules/
+
+dist/
+build/
+
+# =========================
+# Temporary
+# =========================
+tmp/
+temp/
+
+# =========================
+# Dumps
+# =========================
+*.hprof
+
+# =========================
+# Project-specific
+# =========================
+Web/**/.DS_Store

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MyHerzen — Правила использования</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page-bg"></div>
+
+  <header class="top-nav">
+    <div class="top-nav-inner">
+      <a class="brand-button" href="https://moonbaystudio.ru/" aria-label="Moonbay Studio">
+        <img src="img/logo.png" alt="Moonbay Studio">
+      </a>
+
+      <nav class="top-nav-actions" aria-label="Навигация">
+        <a class="nav-pill" href="news">Новости</a>
+        <a class="nav-pill" href="contacts">Контакты</a>
+        <a class="nav-pill" href="account#register" data-auth-link="guest">Регистрация</a>
+        <a class="nav-pill" href="account#login" data-auth-link="guest">Вход</a>
+        <a class="nav-pill" href="account" data-auth-link="account" hidden>Аккаунт</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero-card">
+      <div class="hero-copy">
+        <span class="badge">Юридическая информация</span>
+        <h1>Правила использования</h1>
+        <p>Здесь можно разместить актуальные условия, политику конфиденциальности и ограничения сервиса.</p>
+      </div>
+
+      <div class="hero-stats">
+        <article class="stat-card">
+          <span class="stat-label">Редакция</span>
+          <strong class="stat-value">1.0</strong>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Дата обновления</span>
+          <strong class="stat-value small">15.05.2026</strong>
+        </article>
+        <article class="stat-card wide">
+          <span class="stat-label">Статус</span>
+          <strong class="stat-value small">Черновик для заполнения</strong>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel section-panel">
+      <div class="section-head">
+        <h2>Разделы документа</h2>
+      </div>
+      <div class="plans-grid">
+        <article class="plan-card">
+          <header class="plan-head">
+            <h3>1. Общие положения</h3>
+            <p>Опиши назначение сервиса и стороны соглашения.</p>
+          </header>
+        </article>
+
+        <article class="plan-card">
+          <header class="plan-head">
+            <h3>2. Права и обязанности</h3>
+            <p>Добавь обязательства пользователя и владельца приложения.</p>
+          </header>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-left">
+        <strong>MyHerzen</strong>
+        <span>Приложение для iOS и Mac</span>
+      </div>
+
+      <div class="footer-links">
+        <a href="api">API</a>
+        <a href="terms">Правила использования</a>
+        <a href="contacts">Контакты</a>
+      </div>
+
+      <div class="footer-right">
+        <span>© 2026 MyHerzen</span>
+      </div>
+    </div>
+  </footer>
+  <script src="auth.js"></script>
+  <script src="nav.js"></script>
+</body>
+</html>

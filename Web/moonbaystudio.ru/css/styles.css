@@ -1,0 +1,258 @@
+@import url('https://fonts.cdnfonts.com/css/minecraftia');
+
+@keyframes slideDown {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideFromSides {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes slideFromRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+/* Сброс базовых стилей */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+html, body {
+  height: 100%;          /* Задаём высоту страницы */
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+body {
+  font-family: 'Minecraftia', monospace;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  text-transform: none;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.site-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Контейнер */
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch; /* Растягиваем островки по высоте хэдера */
+  padding: 15px 20px;  /* Общий паддинг для хэдера */
+  border-radius: 15px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 10;
+  background: transparent;
+  animation: slideDown 1s ease-out forwards;
+}
+.header-left,
+.header-right {
+  display: flex;
+  align-items: center; /* Содержимое по центру вертикали */
+  padding: 10px 20px;
+  border-radius: 50px;
+  background-color: #333;
+  color: #fff;
+}
+.header-left {
+  display: flex;
+  align-items: center;   /* Центр по вертикали */
+  justify-content: center; /* Центр по горизонтали */
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: #333;
+  overflow: hidden;
+}
+
+.header-left img {
+  display: block;       /* убирает нижний "зазор" у inline-картинки */
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  object-fit: cover;
+  transition: 1s;
+  cursor: pointer;
+}
+.header-left img:hover {
+  width: 80px;
+  height: 80px;
+}
+.header-right .nav ul {
+  display: flex;
+  gap: 20px;
+  list-style: none;
+}
+
+.header-right .nav a {
+  color: #fff;
+  text-decoration: none;
+}
+
+/* Адаптивность для мобильных */
+@media (max-width: 768px) {
+  .site-header {
+    flex-direction: column;      /* Островки друг под другом */
+    gap: 10px;
+  }
+
+  .header-right .nav ul {
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+/* Footer */
+.site-footer {
+  background-color: #333;
+  color: #fff;
+  padding: 20px 0;
+  text-align: center;
+  margin-top: auto;
+  animation: slideUp 1s ease-out forwards 2s;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .site-header .nav ul {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .hero {
+    padding: 40px 0;
+  }
+}
+
+.subdomains {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100vh;
+  background: #222;
+  color: #fff;
+  text-align: center;
+  margin-top: -100px; /* подтягиваем под хедер */
+  z-index: 0;
+}
+
+.subdomain-grid {
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  width: 100%;
+  height: 100%;
+  flex: 1;
+}
+
+.subdomain-card {
+  position: relative;
+  overflow: hidden;
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-decoration: none;
+  color: #fff;
+  transition: transform 0.6s ease;
+}
+
+/* создаём фоновый слой */
+.subdomain-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 0;
+  transition: transform 0.8s ease, filter 0.8s ease;
+}
+
+/* передаём индивидуальные фоны */
+.subdomain-card:nth-child(1)::before {
+  background-image: url("../img/music.jpg");
+}
+.subdomain-card:nth-child(2)::before {
+  background-image: url("../img/dev.jpeg");
+}
+
+.subdomain-card:nth-child(1) {
+  animation: slideFromSides 1.2s ease-out forwards;
+}
+.subdomain-card:nth-child(2) {
+  animation: slideFromRight 1.2s ease-out forwards;
+  animation-delay: 0.3s;
+}
+/* эффект при наведении */
+.subdomain-card:hover::before {
+  transform: scale(1.1) rotate(3deg);
+  filter: brightness(1.2);
+}
+
+/* контент всегда поверх */
+
+.subdomain-card h3,
+.subdomain-card p {
+  position: relative;
+  z-index: 1;
+}
+
+/* эффект "пишущегося текста" при наведении */
+.subdomain-card h3,
+.subdomain-card p {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  width: 0;
+  transition: width 2s steps(30);
+}
+
+.subdomain-card:hover h3,
+.subdomain-card:hover p {
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .subdomain-grid {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+.subdomain-card h3 {
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+}

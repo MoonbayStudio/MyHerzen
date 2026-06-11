@@ -1,0 +1,815 @@
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException
+from jose import jwt
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+from starlette.requests import Request
+
+from backend.app.core.config import APPLE_AUDIENCES, INVALID_PASSWORD_LOGIN_DETAIL
+from backend.app.core.deps import get_current_user
+from backend.app.core.rate_limit import limiter
+from backend.app.core.security import (
+    create_session_token,
+    hash_password,
+    validate_password_strength,
+    verify_password,
+)
+from backend.app.db.models import AuthProvider, User
+from backend.app.db.session import get_db
+from backend.app.schemas.user import (
+    AppleLoginRequest,
+    AppleLoginResponse,
+    AppleUserResponse,
+    ContactEmailRequest,
+    EmailChangeRequest,
+    EmailConfirmRequest,
+    GoogleLoginRequest,
+    PasswordChangeRequest,
+    PasswordLoginRequest,
+    PasswordSetupRequest,
+    ResetPasswordConfirmRequest,
+    ResetPasswordRequest,
+    SuccessResponse,
+    SignupRequest,
+    SignupVerifyRequest,
+)
+from backend.app.services.auth_service import (
+    apply_apple_email_to_user,
+    apply_google_email_to_user,
+    clear_pending_contact_email,
+    create_password_reset_code,
+    create_pending_contact_email_token,
+    create_pending_email_verification_code,
+    ensure_contact_email_available,
+    get_apple_keys,
+    hash_contact_email_token,
+    normalize_datetime,
+    send_contact_email_verification,
+    send_email_verification_code,
+    send_password_reset_code,
+    validate_contact_email,
+)
+from backend.app.services.user_profile_service import build_user_response, normalize_email, user_has_password
+from backend.app.services.user_sessions_service import SessionTrackingInput, track_login_session
+from backend.app.utils.common import normalize_optional_string
+from backend.app.utils.google_auth import verify_google_token
+
+
+router = APIRouter()
+
+
+def _mask_login_email(email: str) -> str:
+    local_part, separator, domain = email.partition("@")
+    if not separator:
+        return "***"
+    if not local_part:
+        masked_local_part = "***"
+    elif len(local_part) <= 2:
+        masked_local_part = f"{local_part[:1]}***"
+    else:
+        masked_local_part = f"{local_part[:2]}***"
+    return f"{masked_local_part}@{domain}"
+
+
+@limiter.limit("10/minute")
+@router.post("/auth/google", response_model=AppleLoginResponse)
+async def google_login(
+    request: Request,
+    data: GoogleLoginRequest,
+    db: Session = Depends(get_db),
+):
+    payload = verify_google_token(data.idToken)
+    google_sub = payload["sub"]
+    google_email = normalize_email(payload.get("email"))
+
+    # Try to find user by existing Google provider or sub
+    provider = db.query(AuthProvider).filter(
+        AuthProvider.provider == "google",
+        AuthProvider.provider_user_id == google_sub,
+    ).first()
+
+    user = None
+    if provider:
+        user = db.query(User).filter(User.id == provider.user_id).first()
+
+    if user is None and google_email:
+        # Fallback: find by verified contact email for account linking
+        user = db.query(User).filter(
+            func.lower(User.contact_email) == google_email,
+            User.contact_email_verified == True
+        ).first()
+
+    if user is None:
+        # Create new user
+        # Note: apple_sub is mandatory in current schema.
+        # Using "google:{sub}" as a placeholder if no apple_sub exists to satisfy uniqueness/nullability
+        user = User(
+            apple_sub=f"google:{google_sub}",
+            email=google_email,
+            display_name=payload.get("name"),
+        )
+        db.add(user)
+        db.flush()
+    else:
+        # Update existing user info if missing
+        if not user.display_name and payload.get("name"):
+            user.display_name = payload.get("name")
+
+    apply_google_email_to_user(
+        user=user,
+        google_email=google_email,
+    )
+    user.updated_at = datetime.now(timezone.utc)
+
+    if provider is None:
+        provider = AuthProvider(
+            user_id=user.id,
+            provider="google",
+            provider_user_id=google_sub,
+            email=google_email,
+        )
+        db.add(provider)
+    else:
+        if google_email:
+            provider.email = google_email
+
+    db.commit()
+    db.refresh(user)
+
+    session_token = create_session_token(user.id)
+    track_login_session(
+        db=db,
+        user_id=user.id,
+        payload=SessionTrackingInput(
+            session_token=session_token,
+            device_id=data.deviceId,
+            device_name=data.deviceName,
+            platform=data.platform,
+            app_version=data.appVersion,
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        ),
+    )
+
+    return {
+        "token": session_token,
+        "user": build_user_response(db=db, user=user),
+    }
+
+
+@limiter.limit("10/minute")
+@router.post("/me/providers/google", response_model=AppleUserResponse)
+async def link_google_provider(
+    request: Request,
+    data: GoogleLoginRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    print(f"Google provider link started: user_id={current_user.id}")
+    payload = verify_google_token(data.idToken)
+    google_sub = payload["sub"]
+    google_email = normalize_email(payload.get("email"))
+
+    provider = db.query(AuthProvider).filter(
+        AuthProvider.provider == "google",
+        AuthProvider.provider_user_id == google_sub,
+    ).first()
+
+    if provider is not None and provider.user_id != current_user.id:
+        raise HTTPException(
+            status_code=409,
+            detail="Google account is already linked to another user",
+        )
+
+    apply_google_email_to_user(
+        user=current_user,
+        google_email=google_email,
+    )
+    current_user.updated_at = datetime.now(timezone.utc)
+
+    if provider is None:
+        provider = AuthProvider(
+            user_id=current_user.id,
+            provider="google",
+            provider_user_id=google_sub,
+            email=google_email,
+        )
+        db.add(provider)
+    else:
+        provider.user_id = current_user.id
+        if google_email is not None:
+            provider.email = google_email
+
+    db.commit()
+    db.refresh(current_user)
+
+    return build_user_response(db=db, user=current_user)
+
+
+@limiter.limit("3/15minute")
+@router.post("/me/email/change-request")
+async def email_change_request(
+    request: Request,
+    data: EmailChangeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    normalized_email = validate_contact_email(data.email)
+    ensure_contact_email_available(
+        db=db,
+        email=normalized_email,
+        user_id=current_user.id,
+    )
+
+    code = create_pending_email_verification_code(
+        user=current_user,
+        email=normalized_email,
+    )
+
+    db.commit()
+    send_email_verification_code(email=normalized_email, code=code)
+
+    return {"status": "verification_required"}
+
+
+@router.post("/me/email/confirm", response_model=AppleUserResponse)
+async def email_confirm(
+    data: EmailConfirmRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    normalized_code = normalize_optional_string(data.code)
+
+    if normalized_code is None:
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+
+    code_hash = hash_contact_email_token(normalized_code)
+
+    if current_user.pending_contact_email_token_hash != code_hash:
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+
+    expires_at = normalize_datetime(current_user.pending_contact_email_expires_at)
+    now = datetime.now(timezone.utc)
+
+    if expires_at is None or expires_at <= now:
+        clear_pending_contact_email(current_user)
+        current_user.updated_at = now
+        db.commit()
+        raise HTTPException(status_code=400, detail="Verification code expired")
+
+    pending_email = validate_contact_email(current_user.pending_contact_email)
+    ensure_contact_email_available(
+        db=db,
+        email=pending_email,
+        user_id=current_user.id,
+    )
+
+    current_user.contact_email = pending_email
+    current_user.contact_email_verified = True
+    current_user.contact_email_verified_at = now
+    current_user.email = pending_email
+    clear_pending_contact_email(current_user)
+    current_user.updated_at = now
+
+    db.commit()
+    db.refresh(current_user)
+
+    return build_user_response(db=db, user=current_user)
+
+
+@limiter.limit("10/minute")
+@router.post("/auth/contact-email/request", response_model=SuccessResponse)
+async def request_contact_email(
+    request: Request,
+    data: ContactEmailRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    normalized_email = validate_contact_email(data.email)
+    ensure_contact_email_available(
+        db=db,
+        email=normalized_email,
+        user_id=current_user.id,
+    )
+
+    token = create_pending_contact_email_token(
+        user=current_user,
+        email=normalized_email,
+    )
+
+    db.commit()
+    send_contact_email_verification(email=normalized_email, token=token)
+
+    return {"success": True}
+
+
+@limiter.limit("30/minute")
+@router.get("/auth/contact-email/verify", response_model=SuccessResponse)
+async def verify_contact_email(
+    request: Request,
+    token: str,
+    db: Session = Depends(get_db),
+):
+    normalized_token = normalize_optional_string(token)
+
+    if normalized_token is None:
+        raise HTTPException(status_code=400, detail="Invalid verification token")
+
+    token_hash = hash_contact_email_token(normalized_token)
+    user = db.query(User).filter(User.pending_contact_email_token_hash == token_hash).first()
+
+    if user is None:
+        raise HTTPException(status_code=400, detail="Invalid verification token")
+
+    expires_at = normalize_datetime(user.pending_contact_email_expires_at)
+    now = datetime.now(timezone.utc)
+
+    if expires_at is None or expires_at <= now:
+        clear_pending_contact_email(user)
+        user.updated_at = now
+        db.commit()
+        raise HTTPException(status_code=400, detail="Verification token expired")
+
+    pending_email = validate_contact_email(user.pending_contact_email)
+    ensure_contact_email_available(
+        db=db,
+        email=pending_email,
+        user_id=user.id,
+    )
+
+    user.contact_email = pending_email
+    user.contact_email_verified = True
+    user.contact_email_verified_at = now
+    user.email = pending_email
+    clear_pending_contact_email(user)
+    user.updated_at = now
+
+    db.commit()
+
+    return {"success": True}
+
+
+@limiter.limit("10/minute")
+@router.post(
+    "/auth/contact-email/resend-verification",
+    response_model=SuccessResponse,
+)
+async def resend_contact_email_verification(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    pending_email = normalize_email(current_user.pending_contact_email)
+    contact_email = normalize_email(current_user.contact_email)
+
+    if pending_email is not None:
+        target_email = pending_email
+    elif contact_email is not None and not current_user.contact_email_verified:
+        target_email = contact_email
+    else:
+        raise HTTPException(status_code=400, detail="No email verification pending")
+
+    target_email = validate_contact_email(target_email)
+    ensure_contact_email_available(
+        db=db,
+        email=target_email,
+        user_id=current_user.id,
+    )
+
+    token = create_pending_contact_email_token(
+        user=current_user,
+        email=target_email,
+    )
+
+    db.commit()
+    send_contact_email_verification(email=target_email, token=token)
+
+    return {"success": True}
+
+
+@limiter.limit("10/minute")
+@router.post("/me/password/create")
+async def password_create(
+    request: Request,
+    data: PasswordSetupRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    normalized_email = normalize_email(current_user.contact_email)
+
+    if normalized_email is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Verified contact email is required to set password",
+        )
+
+    if not current_user.contact_email_verified:
+        raise HTTPException(
+            status_code=400,
+            detail="Verified contact email is required to set password",
+        )
+
+    if user_has_password(current_user):
+        raise HTTPException(status_code=400, detail="Password already set")
+
+    validate_password_strength(data.password)
+
+    now = datetime.now(timezone.utc)
+    current_user.email = normalized_email
+    current_user.password_hash = hash_password(data.password)
+    current_user.password_created_at = now
+    current_user.password_updated_at = now
+    current_user.updated_at = now
+
+    db.commit()
+
+    return {"status": "password_created"}
+
+
+@router.post("/auth/signup")
+async def signup(
+    request: Request,
+    data: SignupRequest,
+    db: Session = Depends(get_db),
+):
+    normalized_email = validate_contact_email(data.email)
+    ensure_contact_email_available(db, normalized_email, None)
+    validate_password_strength(data.password)
+
+    # Create user with "email:" prefix in apple_sub
+    # Using hash of email to keep it short and unique
+    import hashlib
+    email_hash = hashlib.sha256(normalized_email.encode()).hexdigest()[:20]
+
+    user = User(
+        apple_sub=f"email:{email_hash}",
+        display_name=data.displayName.strip(),
+        password_hash=hash_password(data.password),
+        password_created_at=datetime.now(timezone.utc)
+    )
+    db.add(user)
+    db.flush()
+
+    # Create verification code
+    code = create_pending_email_verification_code(
+        user=user,
+        email=normalized_email,
+    )
+
+    db.commit()
+    send_email_verification_code(email=normalized_email, code=code)
+
+    return {"status": "verification_required", "email": normalized_email}
+
+
+@router.post("/auth/signup/verify", response_model=AppleLoginResponse)
+async def signup_verify(
+    request: Request,
+    data: SignupVerifyRequest,
+    db: Session = Depends(get_db),
+):
+    normalized_email = normalize_email(data.email)
+    if not normalized_email:
+        raise HTTPException(status_code=400, detail="Invalid email")
+
+    code_hash = hash_contact_email_token(data.code)
+
+    # Find user by pending email and code
+    user = db.query(User).filter(
+        User.pending_contact_email == normalized_email,
+        User.pending_contact_email_token_hash == code_hash
+    ).first()
+
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid verification code or email")
+
+    expires_at = normalize_datetime(user.pending_contact_email_expires_at)
+    if expires_at is None or expires_at <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Verification code expired")
+
+    # Verify and activate
+    user.contact_email = normalized_email
+    user.contact_email_verified = True
+    user.contact_email_verified_at = datetime.now(timezone.utc)
+    user.email = normalized_email
+    clear_pending_contact_email(user)
+    user.updated_at = datetime.now(timezone.utc)
+
+    db.commit()
+    db.refresh(user)
+
+    session_token = create_session_token(user.id)
+    track_login_session(
+        db=db,
+        user_id=user.id,
+        payload=SessionTrackingInput(
+            session_token=session_token,
+            device_id=data.deviceId,
+            device_name=data.deviceName,
+            platform=data.platform,
+            app_version=data.appVersion,
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        ),
+    )
+
+    return {
+        "token": session_token,
+        "user": build_user_response(db=db, user=user),
+    }
+
+
+@limiter.limit("10/minute")
+@router.post("/auth/login", response_model=AppleLoginResponse)
+async def password_login(
+    request: Request,
+    data: PasswordLoginRequest,
+    db: Session = Depends(get_db),
+):
+    normalized_email = normalize_email(data.email)
+
+    if normalized_email is None:
+        print("Password login rejected: reason=invalid_email")
+        raise HTTPException(status_code=401, detail=INVALID_PASSWORD_LOGIN_DETAIL)
+
+    masked_email = _mask_login_email(normalized_email)
+    user = db.query(User).filter(
+        func.lower(User.contact_email) == normalized_email,
+        User.contact_email_verified == True,
+    ).first()
+
+    if user is None:
+        print(f"Password login rejected: reason=verified_contact_not_found, email={masked_email}")
+        raise HTTPException(status_code=401, detail=INVALID_PASSWORD_LOGIN_DETAIL)
+
+    if not user_has_password(user):
+        print(f"Password login rejected: reason=password_not_set, email={masked_email}")
+        raise HTTPException(status_code=401, detail=INVALID_PASSWORD_LOGIN_DETAIL)
+
+    password_hash = user.password_hash or ""
+
+    if not verify_password(data.password, password_hash):
+        print(f"Password login rejected: reason=password_mismatch, email={masked_email}")
+        raise HTTPException(status_code=401, detail=INVALID_PASSWORD_LOGIN_DETAIL)
+
+    print(f"Password login accepted: user_id={user.id}")
+
+    session_token = create_session_token(user.id)
+    track_login_session(
+        db=db,
+        user_id=user.id,
+        payload=SessionTrackingInput(
+            session_token=session_token,
+            device_id=data.deviceId,
+            device_name=data.deviceName,
+            platform=data.platform,
+            app_version=data.appVersion,
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        ),
+    )
+
+    return {
+        "token": session_token,
+        "user": build_user_response(db=db, user=user),
+    }
+
+
+@limiter.limit("10/minute")
+@router.post("/me/password/change", response_model=SuccessResponse)
+async def password_change(
+    request: Request,
+    data: PasswordChangeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_password_hash = normalize_optional_string(current_user.password_hash)
+
+    if current_password_hash is None:
+        raise HTTPException(status_code=400, detail="Password is not set")
+
+    if not verify_password(data.currentPassword, current_password_hash):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+    validate_password_strength(data.newPassword)
+
+    now = datetime.now(timezone.utc)
+    current_user.password_hash = hash_password(data.newPassword)
+    current_user.password_updated_at = now
+    current_user.updated_at = now
+
+    db.commit()
+
+    return {"success": True}
+
+
+@limiter.limit("5/15minute")
+@router.post("/auth/password/reset-request")
+async def password_reset_request(
+    request: Request,
+    data: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    normalized_email = normalize_email(data.email)
+
+    if normalized_email is not None:
+        user = db.query(User).filter(
+            func.lower(User.contact_email) == normalized_email,
+            User.contact_email_verified == True,
+        ).first()
+
+        if user is not None:
+            code = create_password_reset_code(user)
+            db.commit()
+            send_password_reset_code(normalized_email, code)
+
+    return {"status": "ok"}
+
+
+@limiter.limit("5/15minute")
+@router.post("/auth/password/reset-confirm")
+async def password_reset_confirm(
+    request: Request,
+    data: ResetPasswordConfirmRequest,
+    db: Session = Depends(get_db),
+):
+    normalized_code = normalize_optional_string(data.code)
+
+    if normalized_code is None:
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+
+    code_hash = hash_contact_email_token(normalized_code)
+    user = db.query(User).filter(User.password_reset_token_hash == code_hash).first()
+
+    if user is None:
+        raise HTTPException(status_code=400, detail="Invalid verification code")
+
+    expires_at = normalize_datetime(user.password_reset_expires_at)
+    now = datetime.now(timezone.utc)
+
+    if expires_at is None or expires_at <= now:
+        user.password_reset_token_hash = None
+        user.password_reset_expires_at = None
+        user.updated_at = now
+        db.commit()
+        raise HTTPException(status_code=400, detail="Verification code expired")
+
+    validate_password_strength(data.newPassword)
+
+    user.password_hash = hash_password(data.newPassword)
+    user.last_password_reset_at = now
+    user.password_updated_at = now
+    user.password_reset_token_hash = None
+    user.password_reset_expires_at = None
+    user.updated_at = now
+
+    db.commit()
+
+    return {"success": True}
+
+
+@limiter.limit("10/minute")
+@router.post("/auth/apple", response_model=AppleLoginResponse)
+async def apple_login(
+    request: Request,
+    data: AppleLoginRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        headers = jwt.get_unverified_header(data.identityToken)
+        kid = headers["kid"]
+
+        matching_key = None
+
+        for key in get_apple_keys():
+            if key["kid"] == kid:
+                matching_key = key
+                break
+
+        if not matching_key:
+            raise HTTPException(status_code=401, detail="Apple public key not found")
+
+        unverified_claims = jwt.get_unverified_claims(data.identityToken)
+        print("🍎 Apple token audience:", unverified_claims.get("aud"))
+        print("🍎 Expected audiences:", APPLE_AUDIENCES)
+
+        payload = jwt.decode(
+            data.identityToken,
+            matching_key,
+            algorithms=["RS256"],
+            options={"verify_aud": False},
+            issuer="https://appleid.apple.com",
+        )
+
+        token_audience = payload.get("aud")
+        is_valid_audience = False
+
+        if isinstance(token_audience, str):
+            is_valid_audience = token_audience in APPLE_AUDIENCES
+        elif isinstance(token_audience, list):
+            is_valid_audience = any(
+                isinstance(aud, str) and aud in APPLE_AUDIENCES for aud in token_audience
+            )
+
+        if not is_valid_audience:
+            raise HTTPException(status_code=401, detail="Invalid Apple token audience")
+
+        apple_sub = payload["sub"]
+        token_email = payload.get("email")
+
+        # Determine email provided in this request
+        provided_email = normalize_email(token_email or data.email)
+
+        provider = db.query(AuthProvider).filter(
+            AuthProvider.provider == "apple",
+            AuthProvider.provider_user_id == apple_sub,
+        ).first()
+
+        user = None
+
+        if provider:
+            user = db.query(User).filter(User.id == provider.user_id).first()
+
+        if user is None:
+            user = db.query(User).filter(User.apple_sub == apple_sub).first()
+
+        if user is None:
+            # New user registration
+            user = User(
+                apple_sub=apple_sub,
+                email=provided_email,
+                apple_email=provided_email,
+                display_name=data.fullName,
+            )
+
+            db.add(user)
+            db.flush()
+            apple_email = provided_email
+        else:
+            # Existing user login
+            if not user.display_name and data.fullName:
+                user.display_name = data.fullName
+
+            # If email is missing, use the one from database
+            apple_email = provided_email or user.apple_email or user.email
+
+        apply_apple_email_to_user(
+            user=user,
+            apple_sub=apple_sub,
+            apple_email=apple_email,
+        )
+        user.updated_at = datetime.now(timezone.utc)
+
+        if provider is None:
+            provider = AuthProvider(
+                user_id=user.id,
+                provider="apple",
+                provider_user_id=apple_sub,
+                email=apple_email,
+            )
+
+            db.add(provider)
+        else:
+            provider.user_id = user.id
+
+            if apple_email is not None:
+                provider.email = apple_email
+
+        db.commit()
+        db.refresh(user)
+
+        session_token = create_session_token(user.id)
+        track_login_session(
+            db=db,
+            user_id=user.id,
+            payload=SessionTrackingInput(
+                session_token=session_token,
+                device_id=data.deviceId,
+                device_name=data.deviceName,
+                platform=data.platform,
+                app_version=data.appVersion,
+                ip_address=request.client.host if request.client else None,
+                user_agent=request.headers.get("user-agent"),
+            ),
+        )
+
+        return {
+            "token": session_token,
+            "user": build_user_response(db=db, user=user),
+        }
+
+    except HTTPException:
+        raise
+    except jwt.ExpiredSignatureError:
+        print("Apple auth error: expired token")
+        raise HTTPException(status_code=401, detail="Apple auth failed: expired token")
+    except jwt.JWTClaimsError as error:
+        print(f"Apple auth error: invalid claims (audience/issuer): {error}")
+        raise HTTPException(status_code=401, detail="Apple auth failed: invalid claims")
+    except jwt.JWTError as error:
+        print(f"Apple auth error: invalid signature or parsing failed: {error}")
+        raise HTTPException(status_code=401, detail="Apple auth failed: invalid token")
+    except Exception as error:
+        print(f"Apple auth error: {type(error).__name__} - {error}")
+        raise HTTPException(status_code=401, detail="Apple auth failed")
