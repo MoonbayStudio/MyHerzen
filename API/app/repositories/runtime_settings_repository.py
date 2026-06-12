@@ -3,7 +3,7 @@ from typing import Iterable, List, Optional
 
 from sqlalchemy.orm import Session
 
-from backend.app.db.models import AppSetting
+from app.db.models import AppSetting
 
 
 def get_setting(db: Session, key: str) -> Optional[AppSetting]:

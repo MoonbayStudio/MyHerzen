@@ -1,17 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.app.core.deps import get_current_user, is_admin
-from backend.app.db.models import User
-from backend.app.db.session import get_db
-from backend.app.schemas.system_notices import (
+from app.core.deps import get_current_user, is_admin
+from app.db.models import User
+from app.db.session import get_db
+from app.schemas.system_notices import (
     ActiveSystemNoticeResponse,
     SystemNoticeCreateRequest,
     SystemNoticeResponse,
     SystemNoticeUpdateRequest,
 )
-from backend.app.schemas.user import SuccessResponse
-from backend.app.services import system_notices_service
+from app.schemas.user import SuccessResponse
+from app.services import system_notices_service
 
 
 router = APIRouter()

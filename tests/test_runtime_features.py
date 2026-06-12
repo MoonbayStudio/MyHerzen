@@ -13,7 +13,7 @@ os.environ["JWT_SECRET"] = "test_secret"
 os.environ["OLLAMA_BASE_URL"] = "http://localhost:11434"
 os.environ["OWNER_EMAILS"] = "owner@example.com"
 
-from backend.app.main import (  # noqa: E402
+from app.main import (  # noqa: E402
     app,
     Base,
     User,
@@ -22,13 +22,13 @@ from backend.app.main import (  # noqa: E402
     create_session_token,
     get_db,
 )
-from backend.app.core.security import hash_password  # noqa: E402
-from backend.app.db.models import AuthProvider, UserSettings  # noqa: E402
-from backend.app.services.auth_service import (  # noqa: E402
+from app.core.security import hash_password  # noqa: E402
+from app.db.models import AuthProvider, UserSettings  # noqa: E402
+from app.services.auth_service import (  # noqa: E402
     apply_apple_email_to_user,
     apply_google_email_to_user,
 )
-from backend.app.utils.session_security import hash_session_token  # noqa: E402
+from app.utils.session_security import hash_session_token  # noqa: E402
 
 
 engine = create_engine(
@@ -53,6 +53,7 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def setup_db():
+    app.dependency_overrides[get_db] = override_get_db
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
@@ -161,7 +162,7 @@ def test_link_google_provider_adds_login_provider(monkeypatch):
     token, _session = _create_tracked_session(db, user.id)
 
     monkeypatch.setattr(
-        "backend.app.routers.auth.verify_google_token",
+        "app.routers.auth.verify_google_token",
         lambda _id_token: {
             "sub": "google-user-sub",
             "email": "ios-user@example.com",
@@ -322,7 +323,7 @@ def test_password_reset_confirm_sets_new_password(monkeypatch):
     sent_codes = []
 
     monkeypatch.setattr(
-        "backend.app.routers.auth.send_password_reset_code",
+        "app.routers.auth.send_password_reset_code",
         lambda email, code: sent_codes.append((email, code)),
     )
 
@@ -369,7 +370,7 @@ def test_password_reset_request_ignores_unverified_contact_email(monkeypatch):
     sent_codes = []
 
     monkeypatch.setattr(
-        "backend.app.routers.auth.send_password_reset_code",
+        "app.routers.auth.send_password_reset_code",
         lambda email, code: sent_codes.append((email, code)),
     )
 

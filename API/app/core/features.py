@@ -1,6 +1,6 @@
 from fastapi import HTTPException
 
-from backend.app.core.config import (
+from app.core.config import (
     ENABLE_ADMIN_ROLE_MANAGEMENT_MODULE,
     ENABLE_AI_AGENT,
     ENABLE_HOMEWORK_MODULE,

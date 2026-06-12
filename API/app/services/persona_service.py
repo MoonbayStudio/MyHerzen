@@ -4,8 +4,8 @@ from typing import Dict, Optional, Tuple
 
 import zoneinfo
 
-from backend.persona_theme import resolve_persona_theme
-from backend.app.services.runtime_settings_service import get_runtime_persona_theme
+from persona_theme import resolve_persona_theme
+from app.services.runtime_settings_service import get_runtime_persona_theme
 
 
 PERSONAS_DIR = os.path.join(

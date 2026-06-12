@@ -3,13 +3,13 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 
-from backend.app.core.deps import get_current_user, ensure_permission
-from backend.app.db.models import User, Badge, UserBadge
-from backend.app.db.session import get_db
-from backend.app.schemas.admin import GrantBadgeRequest, AdminUserResponse
-from backend.app.schemas.user import BadgeResponse
-from backend.app.services.user_profile_service import build_user_badges
-from backend.app.routers.admin_roles import build_admin_user_response_single
+from app.core.deps import get_current_user, ensure_permission
+from app.db.models import User, Badge, UserBadge
+from app.db.session import get_db
+from app.schemas.admin import GrantBadgeRequest, AdminUserResponse
+from app.schemas.user import BadgeResponse
+from app.services.user_profile_service import build_user_badges
+from app.routers.admin_roles import build_admin_user_response_single
 
 router = APIRouter(prefix="/admin", tags=["admin-badges"])
 

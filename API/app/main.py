@@ -4,12 +4,12 @@ from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from backend.app.core.deps import has_permission, is_owner
-from backend.app.core.rate_limit import limiter
-from backend.app.core.security import create_session_token
-from backend.app.db.models import Role, RoleAuditLog, User, UserRole, UserSession
-from backend.app.db.session import Base, engine, get_db
-from backend.app.routers import (
+from app.core.deps import has_permission, is_owner
+from app.core.rate_limit import limiter
+from app.core.security import create_session_token
+from app.db.models import Role, RoleAuditLog, User, UserRole, UserSession
+from app.db.session import Base, engine, get_db
+from app.routers import (
     account,
     admin_roles,
     admin_badges,
@@ -21,8 +21,8 @@ from backend.app.routers import (
     sessions,
     system_notices,
 )
-from backend.app.services.schema_bootstrap_service import ensure_runtime_feature_tables
-from backend.app.services.assistant_policy_service import PLAN_LIMITS, get_user_plan
+from app.services.schema_bootstrap_service import ensure_runtime_feature_tables
+from app.services.assistant_policy_service import PLAN_LIMITS, get_user_plan
 
 
 app = FastAPI(
@@ -35,7 +35,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://myherzen.moonbaystudio.ru"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
 

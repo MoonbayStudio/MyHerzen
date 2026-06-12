@@ -1,6 +1,7 @@
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 
 import os
@@ -9,14 +10,16 @@ os.environ["JWT_SECRET"] = "test_secret"
 os.environ["OLLAMA_BASE_URL"] = "http://localhost:11434"
 os.environ["OWNER_EMAILS"] = "owner@example.com"
 
-from backend.app.main import (
+from app.main import (
     app, Base, get_db, User, Role, UserRole,
     get_user_plan, is_owner, has_permission,
     RoleAuditLog
 )
 
 engine = create_engine(
-    "sqlite:///:memory:", connect_args={"check_same_thread": False}
+    "sqlite:///:memory:",
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -32,6 +35,7 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def setup_db():
+    app.dependency_overrides[get_db] = override_get_db
     Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
     
@@ -51,10 +55,15 @@ def setup_db():
     db.close()
     Base.metadata.drop_all(bind=engine)
 
+
+def _test_user(email: str) -> User:
+    return User(apple_sub=f"test-{email}", contact_email=email)
+
+
 def test_owner_always_admin():
     db = TestingSessionLocal()
-    owner = User(contact_email="owner@example.com")
-    normal = User(contact_email="user@example.com")
+    owner = _test_user("owner@example.com")
+    normal = _test_user("user@example.com")
     db.add_all([owner, normal])
     db.commit()
     
@@ -70,7 +79,7 @@ def test_owner_always_admin():
 
 def test_tester_unlimited():
     db = TestingSessionLocal()
-    tester = User(contact_email="tester@example.com")
+    tester = _test_user("tester@example.com")
     db.add(tester)
     db.commit()
     
@@ -79,12 +88,12 @@ def test_tester_unlimited():
     
     assert get_user_plan(tester.id, db) == "tester"
     # Wait, testing AI limit logic directly is a bit more complex, but PLAN_LIMITS is imported
-    from backend.app.main import PLAN_LIMITS
+    from app.main import PLAN_LIMITS
     assert PLAN_LIMITS[get_user_plan(tester.id, db)] == -1
 
 def test_multiple_roles_highest_priority():
     db = TestingSessionLocal()
-    user = User(contact_email="multi@example.com")
+    user = _test_user("multi@example.com")
     db.add(user)
     db.commit()
     
@@ -97,8 +106,8 @@ def test_multiple_roles_highest_priority():
 
 def test_permission_system_works():
     db = TestingSessionLocal()
-    admin = User(contact_email="admin@example.com")
-    tester = User(contact_email="tester@example.com")
+    admin = _test_user("admin@example.com")
+    tester = _test_user("tester@example.com")
     db.add_all([admin, tester])
     db.commit()
     
@@ -119,7 +128,7 @@ def test_get_admin_users_protected():
 # More complex tests involving endpoints would require mocking the auth token, which might be overkill for this script,
 # but we can test the specific logic of "invalid role rejected" and "owner cannot be revoked" directly via functions if they were separated.
 # Or we can create a mock token.
-from backend.app.main import create_session_token
+from app.main import create_session_token
 
 def get_auth_headers(user_id):
     token = create_session_token(user_id)
@@ -127,8 +136,8 @@ def get_auth_headers(user_id):
 
 def test_invalid_role_rejected():
     db = TestingSessionLocal()
-    admin = User(contact_email="admin_reject@example.com")
-    target = User(contact_email="target@example.com")
+    admin = _test_user("admin_reject@example.com")
+    target = _test_user("target@example.com")
     db.add_all([admin, target])
     db.commit()
     db.add(UserRole(user_id=admin.id, role_type="admin"))
@@ -141,8 +150,8 @@ def test_invalid_role_rejected():
 
 def test_cannot_revoke_owner():
     db = TestingSessionLocal()
-    admin = User(contact_email="admin_revoke@example.com")
-    owner = User(contact_email="owner@example.com")
+    admin = _test_user("admin_revoke@example.com")
+    owner = _test_user("owner@example.com")
     db.add_all([admin, owner])
     db.commit()
     db.add(UserRole(user_id=admin.id, role_type="admin"))
@@ -151,11 +160,11 @@ def test_cannot_revoke_owner():
     headers = get_auth_headers(admin.id)
     response = client.post("/admin/roles/revoke", json={"user_id": owner.id, "role": "admin"}, headers=headers)
     assert response.status_code == 403
-    assert response.json()["detail"] == "Cannot revoke roles from owner"
+    assert response.json()["detail"] == "Cannot revoke admin role from owner"
 
 def test_cannot_remove_last_admin():
     db = TestingSessionLocal()
-    admin = User(contact_email="last_admin@example.com")
+    admin = _test_user("last_admin@example.com")
     db.add(admin)
     db.commit()
     db.add(UserRole(user_id=admin.id, role_type="admin"))
@@ -163,5 +172,5 @@ def test_cannot_remove_last_admin():
     
     headers = get_auth_headers(admin.id)
     response = client.post("/admin/roles/revoke", json={"user_id": admin.id, "role": "admin"}, headers=headers)
-    assert response.status_code == 400
-    assert response.json()["detail"] == "Cannot remove the last admin"
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Cannot revoke admin from yourself as the last admin"

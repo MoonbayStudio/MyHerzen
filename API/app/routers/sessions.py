@@ -1,17 +1,17 @@
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.app.core.deps import get_current_user, is_admin
-from backend.app.db.models import User
-from backend.app.db.session import get_db
-from backend.app.schemas.sessions import (
+from app.core.deps import get_current_user, is_admin
+from app.db.models import User
+from app.db.session import get_db
+from app.schemas.sessions import (
     AccountSessionResponse,
     AdminUserSessionResponse,
     LogoutOthersResponse,
     SessionRevokeResponse,
 )
-from backend.app.utils.session_security import extract_bearer_token
-from backend.app.services import user_sessions_service
+from app.utils.session_security import extract_bearer_token
+from app.services import user_sessions_service
 
 
 router = APIRouter()

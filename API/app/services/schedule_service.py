@@ -4,12 +4,12 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import requests
 from fastapi import HTTPException
 
-from backend.app.core.config import (
+from app.core.config import (
     HERZEN_API_BASE_URL,
     HERZEN_API_TIMEOUT_SECONDS,
     HERZEN_SCHEDULE_API_PATH,
 )
-from backend.app.utils.common import normalize_optional_string, parse_int
+from app.utils.common import normalize_optional_string, parse_int
 
 
 def extract_items(payload: Any) -> List[Dict[str, Any]]:

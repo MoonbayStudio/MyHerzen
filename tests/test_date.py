@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, timedelta
 import zoneinfo
-from backend.app.utils.dates import parse_schedule_date
+from app.utils.dates import parse_schedule_date
 
 def test_parse_schedule_date():
     tz = zoneinfo.ZoneInfo("Europe/Helsinki")

@@ -1,7 +1,7 @@
 from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel
-from backend.app.schemas.user import UserRoleResponse, PendingRoleRequestBadge, BadgeResponse
+from app.schemas.user import UserRoleResponse, PendingRoleRequestBadge, BadgeResponse
 
 class GrantRoleRequest(BaseModel):
     user_id: int

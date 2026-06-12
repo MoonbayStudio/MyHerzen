@@ -2,7 +2,7 @@ import bcrypt
 from datetime import datetime, timezone, timedelta
 from jose import jwt
 from fastapi import HTTPException
-from backend.app.core.config import (
+from app.core.config import (
     JWT_SECRET,
     PASSWORD_MIN_LENGTH,
     PASSWORD_MAX_LENGTH,

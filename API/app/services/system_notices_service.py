@@ -4,8 +4,8 @@ from typing import Any, Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from backend.app.db.models import SystemNotice
-from backend.app.repositories import system_notices_repository
+from app.db.models import SystemNotice
+from app.repositories import system_notices_repository
 
 
 _ALLOWED_NOTICE_TYPES = {"info", "warning", "maintenance", "critical"}

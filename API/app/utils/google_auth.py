@@ -3,7 +3,7 @@ from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token as google_id_token
 from jose import jwt as jose_jwt
 
-from backend.app.core.config import GOOGLE_CLIENT_IDS
+from app.core.config import GOOGLE_CLIENT_IDS
 
 GOOGLE_ISSUERS = {"accounts.google.com", "https://accounts.google.com"}
 

@@ -9,18 +9,18 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
-from backend.app.core.config import OLLAMA_BASE_URL, PELIKASHA_MODEL
-from backend.app.db.models import UsageLimit, User
-from backend.app.schemas.assistant import AssistantChatRequest, AssistantChatResponse
-from backend.app.services.assistant_policy_service import (
+from app.core.config import OLLAMA_BASE_URL, PELIKASHA_MODEL
+from app.db.models import UsageLimit, User
+from app.schemas.assistant import AssistantChatRequest, AssistantChatResponse
+from app.services.assistant_policy_service import (
     PLAN_LIMITS,
     get_plan_message_length_limit,
     get_user_plan,
 )
-from backend.app.services.persona_service import load_persona_prompt
-from backend.app.services.runtime_settings_service import get_runtime_setting_value
-from backend.app.utils.dates import parse_schedule_date
-from backend.app.utils.schedule_context import (
+from app.services.persona_service import load_persona_prompt
+from app.services.runtime_settings_service import get_runtime_setting_value
+from app.utils.dates import parse_schedule_date
+from app.utils.schedule_context import (
     SCHEDULE_SESSION_CACHE_TTL,
     build_schedule_context_rules,
     build_schedule_instructions,

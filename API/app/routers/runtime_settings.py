@@ -1,15 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.app.core.deps import get_current_user, is_admin
-from backend.app.db.models import User
-from backend.app.db.session import get_db
-from backend.app.schemas.runtime_settings import (
+from app.core.deps import get_current_user, is_admin
+from app.db.models import User
+from app.db.session import get_db
+from app.schemas.runtime_settings import (
     AppSettingAdminResponse,
     PublicConfigResponse,
     UpdateAppSettingRequest,
 )
-from backend.app.services import runtime_settings_service
+from app.services import runtime_settings_service
 
 
 router = APIRouter()

@@ -4,7 +4,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from backend.app.core.deps import (
+from app.core.deps import (
     ensure_admin_or_moderator,
     ensure_permission,
     get_current_user,
@@ -14,10 +14,10 @@ from backend.app.core.deps import (
     has_user_role,
     user_has_group_leader_role,
 )
-from backend.app.core.features import require_role_requests_enabled
-from backend.app.db.models import GroupLeader, LeaderRequest, RoleRequest, User
-from backend.app.db.session import get_db
-from backend.app.schemas.roles import (
+from app.core.features import require_role_requests_enabled
+from app.db.models import GroupLeader, LeaderRequest, RoleRequest, User
+from app.db.session import get_db
+from app.schemas.roles import (
     LeaderRequestCreateRequest,
     LeaderRequestRejectRequest,
     LeaderRequestResponse,
@@ -27,7 +27,7 @@ from backend.app.schemas.roles import (
     RoleRequestRejectRequest,
     RoleRequestResponse,
 )
-from backend.app.services.roles_service import (
+from app.services.roles_service import (
     ensure_user_role_exists,
     get_valid_role_names,
     leader_request_to_response,
@@ -36,7 +36,7 @@ from backend.app.services.roles_service import (
     role_request_to_response,
     subscription_role_request_query,
 )
-from backend.app.utils.common import normalize_optional_string
+from app.utils.common import normalize_optional_string
 
 
 router = APIRouter(dependencies=[Depends(require_role_requests_enabled)])

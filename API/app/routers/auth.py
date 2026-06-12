@@ -6,18 +6,18 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
-from backend.app.core.config import APPLE_AUDIENCES, INVALID_PASSWORD_LOGIN_DETAIL
-from backend.app.core.deps import get_current_user
-from backend.app.core.rate_limit import limiter
-from backend.app.core.security import (
+from app.core.config import APPLE_AUDIENCES, INVALID_PASSWORD_LOGIN_DETAIL
+from app.core.deps import get_current_user
+from app.core.rate_limit import limiter
+from app.core.security import (
     create_session_token,
     hash_password,
     validate_password_strength,
     verify_password,
 )
-from backend.app.db.models import AuthProvider, User
-from backend.app.db.session import get_db
-from backend.app.schemas.user import (
+from app.db.models import AuthProvider, User
+from app.db.session import get_db
+from app.schemas.user import (
     AppleLoginRequest,
     AppleLoginResponse,
     AppleUserResponse,
@@ -34,7 +34,7 @@ from backend.app.schemas.user import (
     SignupRequest,
     SignupVerifyRequest,
 )
-from backend.app.services.auth_service import (
+from app.services.auth_service import (
     apply_apple_email_to_user,
     apply_google_email_to_user,
     clear_pending_contact_email,
@@ -50,10 +50,10 @@ from backend.app.services.auth_service import (
     send_password_reset_code,
     validate_contact_email,
 )
-from backend.app.services.user_profile_service import build_user_response, normalize_email, user_has_password
-from backend.app.services.user_sessions_service import SessionTrackingInput, track_login_session
-from backend.app.utils.common import normalize_optional_string
-from backend.app.utils.google_auth import verify_google_token
+from app.services.user_profile_service import build_user_response, normalize_email, user_has_password
+from app.services.user_sessions_service import SessionTrackingInput, track_login_session
+from app.utils.common import normalize_optional_string
+from app.utils.google_auth import verify_google_token
 
 
 router = APIRouter()

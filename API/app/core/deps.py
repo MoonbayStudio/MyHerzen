@@ -3,17 +3,17 @@ from fastapi import Header, Depends, HTTPException
 from sqlalchemy.orm import Session
 from jose import jwt
 
-from backend.app.core.config import (
+from app.core.config import (
     JWT_SECRET,
     OWNER_EMAILS_SET,
     ADMIN_EMAIL_SET,
     ROLE_PERMISSIONS,
 )
-from backend.app.db.session import get_db
-from backend.app.db.models import User, UserSettings, UserRole, GroupLeader, GroupMembership
-from backend.app.utils.email import normalize_email
-from backend.app.utils.session_security import extract_bearer_token
-from backend.app.services.user_sessions_service import assert_session_active_for_token
+from app.db.session import get_db
+from app.db.models import User, UserSettings, UserRole, GroupLeader, GroupMembership
+from app.utils.email import normalize_email
+from app.utils.session_security import extract_bearer_token
+from app.services.user_sessions_service import assert_session_active_for_token
 
 
 def get_current_user(

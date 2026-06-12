@@ -5,32 +5,32 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case
 from sqlalchemy.orm import Session
 
-from backend.app.core.deps import (
+from app.core.deps import (
     ensure_permission,
     get_current_user,
     get_user_primary_email,
     is_owner,
 )
-from backend.app.core.features import require_admin_role_management_enabled
-from backend.app.db.models import GroupLeader, RoleAuditLog, RoleRequest, UsageLimit, User, UserRole
-from backend.app.db.session import get_db
-from backend.app.schemas.admin import AdminUserResponse, GrantRoleRequest, RevokeRoleRequest
-from backend.app.schemas.roles import AdminRoleRequestResponse, RoleRequestReviewRequest
-from backend.app.schemas.user import PendingRoleRequestBadge
-from backend.app.services.assistant_policy_service import PLAN_LIMITS
-from backend.app.services.roles_service import (
+from app.core.features import require_admin_role_management_enabled
+from app.db.models import GroupLeader, RoleAuditLog, RoleRequest, UsageLimit, User, UserRole
+from app.db.session import get_db
+from app.schemas.admin import AdminUserResponse, GrantRoleRequest, RevokeRoleRequest
+from app.schemas.roles import AdminRoleRequestResponse, RoleRequestReviewRequest
+from app.schemas.user import PendingRoleRequestBadge
+from app.services.assistant_policy_service import PLAN_LIMITS
+from app.services.roles_service import (
     admin_role_request_to_response,
     build_user_roles,
     get_valid_role_names,
     grant_role_internal,
     subscription_role_request_query,
 )
-from backend.app.services.user_profile_service import (
+from app.services.user_profile_service import (
     build_user_badges,
     build_user_response,
 )
-from backend.app.utils.common import normalize_optional_string
-from backend.app.utils.email import normalize_email
+from app.utils.common import normalize_optional_string
+from app.utils.email import normalize_email
 
 
 router = APIRouter(dependencies=[Depends(require_admin_role_management_enabled)])

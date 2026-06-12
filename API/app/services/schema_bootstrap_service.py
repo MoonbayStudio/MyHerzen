@@ -2,7 +2,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from backend.app.db.models import AppSetting, SystemNotice, UserSession, Badge, UserBadge
+from app.db.models import AppSetting, SystemNotice, UserSession, Badge, UserBadge
 
 
 def ensure_runtime_feature_tables(engine: Engine) -> None:

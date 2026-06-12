@@ -8,7 +8,7 @@ from fastapi import HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from backend.app.core.config import (
+from app.core.config import (
     APPLE_KEYS_URL,
     EMAIL_VERIFICATION_EXPIRES_HOURS,
     FRONTEND_BASE_URL,
@@ -16,10 +16,10 @@ from backend.app.core.config import (
     RESEND_API_URL,
     RESEND_FROM_EMAIL,
 )
-from backend.app.db.models import User
-from backend.app.services.user_profile_service import is_apple_relay_email, normalize_email
-from backend.app.utils.common import normalize_optional_string
-from backend.app.utils.email import EMAIL_VERIFICATION_PATTERN
+from app.db.models import User
+from app.services.user_profile_service import is_apple_relay_email, normalize_email
+from app.utils.common import normalize_optional_string
+from app.utils.email import EMAIL_VERIFICATION_PATTERN
 
 
 apple_keys_cache = None

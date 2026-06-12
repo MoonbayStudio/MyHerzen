@@ -2,20 +2,20 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime, timezone
-from backend.app.db.session import get_db
-from backend.app.db.models import User, GroupMembership, UserSettings, UserRole, GroupLeader, Homework
-from backend.app.core.features import require_homework_enabled
-from backend.app.core.deps import (
+from app.db.session import get_db
+from app.db.models import User, GroupMembership, UserSettings, UserRole, GroupLeader, Homework
+from app.core.features import require_homework_enabled
+from app.core.deps import (
     get_current_user, is_admin, is_moderator, can_access_group,
     user_has_group_leader_role, ensure_group_access
 )
-from backend.app.schemas.group import GroupInviteRequest
-from backend.app.schemas.homework import HomeworkCreateRequest, HomeworkOptionResponse, HomeworkUpdateRequest
-from backend.app.services.assistant_policy_service import get_user_plan
-from backend.app.services.homework_service import build_homework_options, homework_to_response
-from backend.app.services.roles_service import build_user_roles
-from backend.app.services.user_profile_service import build_user_badges
-from backend.app.utils.email import normalize_email
+from app.schemas.group import GroupInviteRequest
+from app.schemas.homework import HomeworkCreateRequest, HomeworkOptionResponse, HomeworkUpdateRequest
+from app.services.assistant_policy_service import get_user_plan
+from app.services.homework_service import build_homework_options, homework_to_response
+from app.services.roles_service import build_user_roles
+from app.services.user_profile_service import build_user_badges
+from app.utils.email import normalize_email
 
 router = APIRouter()
 

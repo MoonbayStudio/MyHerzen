@@ -4,7 +4,7 @@ from typing import List, Optional
 from sqlalchemy import case, or_
 from sqlalchemy.orm import Session
 
-from backend.app.db.models import SystemNotice
+from app.db.models import SystemNotice
 
 
 def list_notices(db: Session) -> List[SystemNotice]:

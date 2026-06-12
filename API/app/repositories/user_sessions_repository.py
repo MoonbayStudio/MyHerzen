@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
-from backend.app.db.models import UserSession
+from app.db.models import UserSession
 
 
 def get_session_by_id(db: Session, session_id: int) -> Optional[UserSession]:

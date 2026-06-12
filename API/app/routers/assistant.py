@@ -4,12 +4,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
-from backend.app.core.deps import get_optional_user
-from backend.app.core.features import require_ai_agent_enabled
-from backend.app.db.models import User
-from backend.app.db.session import get_db
-from backend.app.schemas.assistant import AssistantChatRequest, AssistantChatResponse
-from backend.app.services.assistant_service import run_assistant_chat
+from app.core.deps import get_optional_user
+from app.core.features import require_ai_agent_enabled
+from app.db.models import User
+from app.db.session import get_db
+from app.schemas.assistant import AssistantChatRequest, AssistantChatResponse
+from app.services.assistant_service import run_assistant_chat
 
 
 router = APIRouter()

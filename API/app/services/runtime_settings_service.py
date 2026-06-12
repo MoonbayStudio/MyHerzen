@@ -6,9 +6,9 @@ from typing import Any, Dict, Literal, Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from backend.app.core.config import PERSONA_THEME
-from backend.app.db.session import SessionLocal
-from backend.app.repositories import runtime_settings_repository
+from app.core.config import PERSONA_THEME
+from app.db.session import SessionLocal
+from app.repositories import runtime_settings_repository
 
 
 SettingValueType = Literal["string", "int", "bool", "json"]

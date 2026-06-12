@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from backend.app.db.models import Homework
-from backend.app.services.schedule_service import (
+from app.db.models import Homework
+from app.services.schedule_service import (
     extract_lesson_type,
     extract_subject_name,
     extract_teacher_id,

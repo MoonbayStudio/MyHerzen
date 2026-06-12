@@ -3,8 +3,8 @@ from typing import Any, Dict, List, Optional, Set
 
 from sqlalchemy.orm import Session
 
-from backend.app.core.deps import get_user_primary_email, has_user_role, is_admin
-from backend.app.db.models import (
+from app.core.deps import get_user_primary_email, has_user_role, is_admin
+from app.db.models import (
     GroupLeader,
     Role,
     RoleAuditLog,
@@ -12,7 +12,7 @@ from backend.app.db.models import (
     User,
     UserRole,
 )
-from backend.app.utils.common import normalize_optional_string
+from app.utils.common import normalize_optional_string
 
 SUPPORTED_ROLE_TYPES = {
     "group_leader",

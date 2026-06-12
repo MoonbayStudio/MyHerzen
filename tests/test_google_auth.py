@@ -7,7 +7,7 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["JWT_SECRET"] = "test_secret"
 os.environ["OLLAMA_BASE_URL"] = "http://localhost:11434"
 
-from backend.app.utils import google_auth  # noqa: E402
+from app.utils import google_auth  # noqa: E402
 
 
 def test_verify_google_token_uses_token_audience(monkeypatch):

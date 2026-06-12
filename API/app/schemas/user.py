@@ -1,7 +1,7 @@
 from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel
-from backend.app.schemas.sessions import SessionClientInfo
+from app.schemas.sessions import SessionClientInfo
 
 class SuccessResponse(BaseModel):
     success: bool

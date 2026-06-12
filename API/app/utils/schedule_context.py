@@ -3,14 +3,14 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from backend.app.schemas.assistant import CachedSchedulePayload
-from backend.app.services.schedule_service import (
+from app.schemas.assistant import CachedSchedulePayload
+from app.services.schedule_service import (
     get_schedule_entries_for_group,
     normalize_optional_string,
     normalize_schedule_lesson,
     parse_schedule_lessons,
 )
-from backend.app.utils.dates import parse_iso_datetime
+from app.utils.dates import parse_iso_datetime
 
 SCHEDULE_SESSION_CACHE_TTL = timedelta(minutes=30)
 DEVICE_SCHEDULE_CACHE_MAX_AGE = timedelta(hours=6)

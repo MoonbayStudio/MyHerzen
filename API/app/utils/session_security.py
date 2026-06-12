@@ -1,7 +1,7 @@
 import hashlib
 from typing import Optional
 
-from backend.app.core.config import JWT_SECRET
+from app.core.config import JWT_SECRET
 
 
 _ALLOWED_PLATFORMS = {

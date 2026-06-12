@@ -3,11 +3,11 @@ from typing import Any, Dict, Optional
 
 from sqlalchemy.orm import Session
 
-from backend.app.core.config import APPLE_RELAY_EMAIL_DOMAIN
-from backend.app.db.models import AuthProvider, UsageLimit, User, Badge, UserBadge, UserSettings
-from backend.app.services.assistant_policy_service import PLAN_LIMITS, get_user_plan
-from backend.app.services.roles_service import build_user_roles
-from backend.app.utils.common import normalize_optional_string
+from app.core.config import APPLE_RELAY_EMAIL_DOMAIN
+from app.db.models import AuthProvider, UsageLimit, User, Badge, UserBadge, UserSettings
+from app.services.assistant_policy_service import PLAN_LIMITS, get_user_plan
+from app.services.roles_service import build_user_roles
+from app.utils.common import normalize_optional_string
 
 
 def normalize_email(value: Any) -> Optional[str]:

@@ -6,8 +6,8 @@ from typing import Any, Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from backend.app.db.models import User
-from backend.app.core.config import (
+from app.db.models import User
+from app.core.config import (
     APPLE_RELAY_EMAIL_DOMAIN,
     EMAIL_VERIFICATION_EXPIRES_HOURS
 )

@@ -10,7 +10,7 @@ services:
       - modules.flags.env
     environment:
       DATABASE_URL: "postgresql://myherzen:${DATABASE_PASSWORD}@myherzen-db:5432/myherzen"
-      PYTHONPATH: /app
+      PYTHONPATH: /app/API:/app
     depends_on:
       - myherzen-db
 

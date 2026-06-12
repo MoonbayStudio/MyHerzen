@@ -2,8 +2,8 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from backend.app.core.deps import is_owner
-from backend.app.db.models import User, UserRole
+from app.core.deps import is_owner
+from app.db.models import User, UserRole
 
 PLAN_LIMITS = {
     "admin": -1,

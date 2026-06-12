@@ -5,9 +5,9 @@ from typing import Any, Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from backend.app.db.models import UserSession
-from backend.app.repositories import user_sessions_repository
-from backend.app.utils.session_security import (
+from app.db.models import UserSession
+from app.repositories import user_sessions_repository
+from app.utils.session_security import (
     hash_session_token,
     mask_ip_address,
     normalize_platform,
