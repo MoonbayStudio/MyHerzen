@@ -44,8 +44,18 @@ modules.flags.env
 
 *.pem
 *.key
+*.p8
 *.p12
+*.crt
+*.cer
+*.der
+*.jks
+*.keystore
 *.mobileprovision
+
+secrets.*
+credentials.*
+service-account*.json
 
 GoogleService-Info.plist
 google-services.json

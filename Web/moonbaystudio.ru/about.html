@@ -1,183 +1,83 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Разработка — Moonbay</title>
-  <link rel="stylesheet" href="css/style.css">
-  <link rel="icon" href="/favicon.ico" type="image/x-icon">
+  <title>О нас — Moonbay Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
-
-<header class="site-header">
-  <div class="header-left">
-    <a class="logo" href="index.html" aria-label="Moonbay">
-      <img src="../img/logo.png" alt="Moonbay">
-    </a>
-  </div>
-  <div class="header-right">
-    <nav class="nav" aria-label="Навигация">
-      <ul>
-        <li><a href="index.html">Главная</a></li>
-        <li><a class="is-active" href="apps.html">Приложения</a></li>
-        <li><a href="contacts.html">Контакты</a></li>
-      </ul>
-    </nav>
-  </div>
-</header>
-
-<main class="site-main">
-  <section class="about-hero">
-    <div class="container">
-      <p class="kicker">Moonbay Studio</p>
-      <h2>О нас</h2>
-      <p class="lead">
-        Moonbay — это творческая студия на стыке музыки, технологий и визуального стиля.
-        Мы помогаем идеям превращаться в треки, продукты и проекты, которые хочется открывать снова.
-      </p>
-      <div class="hero-actions">
-        <a class="btn" href="index.html#subdomains">Посмотреть направления</a>
-        <a class="btn btn-ghost" href="contacts.html">Связаться</a>
+  <div class="page-bg"></div>
+  <header class="top-nav">
+    <div class="top-nav-inner">
+      <a class="brand-button" href="./" aria-label="Moonbay Studio">
+        <img src="img/logo.png" alt="Moonbay Studio">
+      </a>
+      <nav class="top-nav-actions" aria-label="Навигация">
+        <a class="nav-pill" href="./">Главная</a> <a class="nav-pill is-active" href="about">О нас</a> <a class="nav-pill" href="apps">Приложения</a> <a class="nav-pill" href="services">Услуги</a> <a class="nav-pill" href="contacts">Контакты</a>
+      </nav>
+    </div>
+  </header>
+  <main class="container">
+    <section class="hero-card">
+      <div class="hero-copy">
+        <span class="badge">Студия</span>
+        <h1>О нас</h1>
+        <p>Moonbay Studio объединяет музыку, разработку и продуктовый дизайн в одной системе.</p>
+        
+      </div>
+      <div class="hero-stats">
+        <article class="stat-card">
+          <span class="stat-label">Студия</span>
+          <strong class="stat-value">Moonbay</strong>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Год</span>
+          <strong class="stat-value">2026</strong>
+        </article>
+        <article class="stat-card wide">
+          <span class="stat-label">Формат</span>
+          <strong class="stat-value small">Музыка, приложения, веб и поддержка проектов</strong>
+        </article>
+      </div>
+    </section>
+    <section class="panel section-panel">
+      <div class="section-head">
+        <h2>Разделы</h2>
+      </div>
+      <div class="card-grid">
+        <article class="info-card featured">
+          <h3>Подход</h3>
+          <p>Сначала смысл и пользовательский сценарий, затем визуальная оболочка и техническая реализация.</p>
+        </article>
+        <article class="info-card">
+          <h3>Команда</h3>
+          <p>Мы работаем с артистами, авторами приложений и собственными экспериментальными проектами.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <div class="footer-left">
+        <strong>Moonbay Studio</strong>
+        <span>Главный сайт</span>
+      </div>
+      <div class="footer-links">
+        <a href="terms">Условия использования</a>
+        <a href="privacy">Политика конфиденциальности</a>
+        <a href="cookies">Политика Cookie</a>
+        <button type="button" data-cookie-settings>Настройки Cookie</button>
+      </div>
+      <div class="footer-right">
+        <span>© 2026 Moonbay Studio. Все права защищены.</span>
       </div>
     </div>
-  </section>
-
-  <section class="about-block">
-    <div class="container two-col">
-      <div>
-        <h3>Кто мы</h3>
-        <p>
-          Мы — небольшая команда разработчиков, дизайнеров и музыкантов. Нам важно,
-          чтобы проекты были не только функциональными, но и эмоциональными: с характером,
-          атмосферой и вниманием к деталям.
-        </p>
-        <p>
-          В Moonbay мы любим «чистую» подачу и простые решения: чтобы пользователь не думал,
-          как пользоваться — а просто кайфовал.
-        </p>
-      </div>
-      <div class="panel">
-        <h3>Что мы делаем</h3>
-        <ul class="checklist">
-          <li>🎧 Музыка: треки, обложки, релизы, оформление</li>
-          <li>💻 Разработка: сайты, приложения, инструменты для творчества</li>
-          <li>🤝 Комьюнити: обмен опытом и совместные релизы</li>
-        </ul>
-      </div>
-    </div>
-  </section>
-
-  <section class="values">
-    <div class="container">
-      <h3>Наши ценности</h3>
-      <div class="cards">
-        <div class="card">
-          <h4>🎧 Свобода творчества</h4>
-          <p>Каждый может стать создателем. Мы поддерживаем идеи и эксперимент.</p>
-        </div>
-        <div class="card">
-          <h4>💡 Инновации</h4>
-          <p>Технологии — не ради галочки, а ради живых проектов и удобства.</p>
-        </div>
-        <div class="card">
-          <h4>🤝 Открытость</h4>
-          <p>Делимся опытом, учимся друг у друга и растим комьюнити.</p>
-        </div>
-        <div class="card">
-          <h4>✨ Стиль</h4>
-          <p>Эстетика важна так же, как функциональность — это часть эмоции.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="stats">
-    <div class="container">
-      <div class="stats-grid">
-        <div class="stat">
-          <div class="stat-num">01</div>
-          <div class="stat-text">Единый стиль на всех страницах</div>
-        </div>
-        <div class="stat">
-          <div class="stat-num">02</div>
-          <div class="stat-text">Фокус на UX и "вайб"</div>
-        </div>
-        <div class="stat">
-          <div class="stat-num">03</div>
-          <div class="stat-text">Музыка + разработка = Moonbay</div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="team">
-    <div class="container">
-      <h3>Команда</h3>
-      <p class="muted">
-        Сейчас мы небольшие — и в этом наша сила: быстро двигаемся, легко общаемся и держим качество.
-        Если хочешь стать частью Moonbay — напиши нам.
-      </p>
-      <div class="team-grid">
-        <div class="member">
-          <div class="avatar" aria-hidden="true"></div>
-          <h4>Продакшн</h4>
-          <p>Треки, звук, релизы</p>
-        </div>
-        <div class="member">
-          <div class="avatar" aria-hidden="true"></div>
-          <h4>Разработка</h4>
-          <p>Сайты, приложения</p>
-        </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="cta">
-    <div class="container cta-box">
-      <h3>Давай сделаем что‑то крутое</h3>
-      <p class="muted">Расскажи, что ты хочешь собрать — трек, сайт или целый проект.</p>
-      <div class="cta-actions">
-        <a class="btn cta-btn" href="contacts.html">Написать в Moonbay</a>
-      </div>
-    </div>
-  </section>
-  <section class="socials">
-    <div class="container socials-box">
-      <h3>Мы в соцсетях</h3>
-      <p class="muted">Следи за релизами, проектами и закулисьем Moonbay</p>
-      <div class="socials-grid">
-        <a href="#" class="social-card" aria-label="Telegram">
-          <span class="social-icon">✈️</span>
-          <span class="social-name">Telegram</span>
-          <span class="social-qr" aria-hidden="true"></span>
-        </a>
-        <a href="#" class="social-card" aria-label="VK">
-          <span class="social-icon">🖤</span>
-          <span class="social-name">VK</span>
-          <span class="social-qr" aria-hidden="true"></span>
-        </a>
-        <a href="#" class="social-card" aria-label="YouTube">
-          <span class="social-icon">▶️</span>
-          <span class="social-name">YouTube</span>
-          <span class="social-qr" aria-hidden="true"></span>
-        </a>
-        <a href="#" class="social-card" aria-label="SoundCloud">
-          <span class="social-icon">☁️</span>
-          <span class="social-name">SoundCloud</span>
-          <span class="social-qr" aria-hidden="true"></span>
-        </a>
-      </div>
-    </div>
-  </section>
-
-</main>
-
-<footer class="site-footer">
-  <div class="container">
-    <p>© 2026 Moonbay Studio. Все права защищены.</p>
-  </div>
-</footer>
-
+  </footer>
+  <script src="js/cookies.js"></script>
 </body>
 </html>
