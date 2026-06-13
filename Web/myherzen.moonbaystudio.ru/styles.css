@@ -513,6 +513,10 @@ img {
   font-weight: 700;
 }
 
+.google-fallback-button {
+  margin-top: 0;
+}
+
 .account-label {
   color: #e8ecfb;
   font-weight: 600;

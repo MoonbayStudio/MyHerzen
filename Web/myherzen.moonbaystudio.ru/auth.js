@@ -186,18 +186,32 @@
     return messages.fallback;
   }
 
-  function initAppleAuth() {
+  function getAppleAuthApi() {
     if (
       typeof window.AppleID === "undefined" ||
       !window.AppleID ||
       !window.AppleID.auth ||
       typeof window.AppleID.auth.init !== "function"
     ) {
+      return null;
+    }
+
+    return window.AppleID.auth;
+  }
+
+  function isAppleAuthAvailable() {
+    return !!getAppleAuthApi();
+  }
+
+  function initAppleAuth() {
+    var appleAuthApi = getAppleAuthApi();
+
+    if (!appleAuthApi) {
       return false;
     }
 
     if (!isAppleInitialized) {
-      window.AppleID.auth.init({
+      appleAuthApi.init({
         clientId: APPLE_CLIENT_CONFIG.clientId,
         scope: APPLE_CLIENT_CONFIG.scope,
         redirectURI: APPLE_CLIENT_CONFIG.redirectURI,
@@ -503,15 +517,20 @@
     container.classList.remove("is-disabled");
     container.setAttribute("aria-disabled", "false");
 
-    googleIdApi.renderButton(container, {
-      type: "standard",
-      theme: "outline",
-      size: "large",
-      text: options && options.text ? options.text : "signin_with",
-      shape: "pill",
-      logo_alignment: "left",
-      width: Math.min(width, 400)
-    });
+    try {
+      googleIdApi.renderButton(container, {
+        type: "standard",
+        theme: "outline",
+        size: "large",
+        text: options && options.text ? options.text : "signin_with",
+        shape: "pill",
+        logo_alignment: "left",
+        width: Math.min(width, 400)
+      });
+    } catch (error) {
+      console.error(error);
+      return false;
+    }
 
     return true;
   }
@@ -564,6 +583,7 @@
 
   window.MyHerzenAuth = {
     initAppleAuth: initAppleAuth,
+    isAppleAuthAvailable: isAppleAuthAvailable,
     initGoogleAuth: initGoogleAuth,
     isGoogleAuthAvailable: isGoogleAuthAvailable,
     renderGoogleButton: renderGoogleButton,

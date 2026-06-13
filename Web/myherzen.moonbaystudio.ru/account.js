@@ -79,10 +79,35 @@
         if ("disabled" in button) {
           button.disabled = disabled;
         }
+        var fallbackButton = button.querySelector ? button.querySelector("button") : null;
+        if (fallbackButton) {
+          fallbackButton.disabled = disabled;
+        }
         button.classList.toggle("is-disabled", disabled);
         button.setAttribute("aria-disabled", disabled ? "true" : "false");
       }
     });
+  }
+
+  function setGoogleSlotFallback(slot, label, disabled) {
+    if (!slot) {
+      return;
+    }
+
+    slot.innerHTML = "";
+    slot.classList.toggle("is-disabled", !!disabled);
+    slot.setAttribute("aria-disabled", disabled ? "true" : "false");
+
+    var button = document.createElement("button");
+    button.type = "button";
+    button.className = "button secondary google-button google-fallback-button";
+    button.textContent = label;
+    button.disabled = !!disabled;
+    button.addEventListener("click", function () {
+      handleGoogleLogin(button);
+    });
+
+    slot.appendChild(button);
   }
 
   async function handleGoogleCredentialResponse(response) {
@@ -104,21 +129,53 @@
     }
   }
 
-  function renderGoogleButtons() {
-    if (typeof auth.renderGoogleButton !== "function") {
+  function renderGoogleSlot(slot, options) {
+    if (!slot) {
+      return true;
+    }
+
+    var fallbackLabel = options && options.fallbackLabel ? options.fallbackLabel : "Войти через Google";
+    var loadingLabel = slot.dataset.loadingLabel || "Google Login загружается...";
+
+    setGoogleSlotFallback(slot, loadingLabel, true);
+
+    if (
+      typeof auth.renderGoogleButton !== "function" ||
+      typeof auth.isGoogleAuthAvailable !== "function" ||
+      !auth.isGoogleAuthAvailable()
+    ) {
       return false;
     }
 
-    var loginReady = !loginGoogleButton || auth.renderGoogleButton(
-      loginGoogleButton,
+    var rendered = auth.renderGoogleButton(
+      slot,
       handleGoogleCredentialResponse,
-      { text: "signin_with" }
+      { text: options && options.text ? options.text : "signin_with" }
     );
-    var registerReady = !registerGoogleButton || auth.renderGoogleButton(
-      registerGoogleButton,
-      handleGoogleCredentialResponse,
-      { text: "signup_with" }
-    );
+
+    if (!rendered) {
+      setGoogleSlotFallback(slot, fallbackLabel, false);
+      return false;
+    }
+
+    window.setTimeout(function () {
+      if (slot.children.length === 0) {
+        setGoogleSlotFallback(slot, fallbackLabel, false);
+      }
+    }, 1200);
+
+    return true;
+  }
+
+  function renderGoogleButtons() {
+    var loginReady = renderGoogleSlot(loginGoogleButton, {
+      text: "signin_with",
+      fallbackLabel: "Войти через Google"
+    });
+    var registerReady = renderGoogleSlot(registerGoogleButton, {
+      text: "signup_with",
+      fallbackLabel: "Зарегистрироваться через Google"
+    });
 
     return loginReady && registerReady;
   }
@@ -181,17 +238,18 @@
   }
 
   async function restoreSession() {
-    var appleReady = typeof auth.initAppleAuth === "function" ? auth.initAppleAuth() : false;
-    setAppleButtonsDisabled(!appleReady);
+    if (typeof auth.initAppleAuth === "function") {
+      auth.initAppleAuth();
+    }
+    setAppleButtonsDisabled(false);
 
-    var googleReady = renderGoogleButtons();
-    setGoogleButtonsDisabled(!googleReady);
+    renderGoogleButtons();
 
     var token = auth.getToken();
     if (!token) {
       var methods = ["почте", "регистрацию"];
-      if (appleReady) methods.push("Apple");
-      if (googleReady) methods.push("Google");
+      methods.push("Apple");
+      methods.push("Google");
 
       var msg = "Выберите вход по " + methods.join(", ") + ".";
       renderLoggedOut(msg);
@@ -222,6 +280,19 @@
     } catch (error) {
       console.error(error);
       setMessage("Не удалось начать вход через Apple. Попробуйте позже.", "error");
+    } finally {
+      setLoading(button, false);
+    }
+  }
+
+  async function handleGoogleLogin(button) {
+    try {
+      setLoading(button, true, "Открываем Google...");
+      var result = await auth.loginWithGoogle();
+      await handleAuthResult(result, "Не удалось выполнить вход через Google.");
+    } catch (error) {
+      console.error(error);
+      setMessage("Не удалось начать вход через Google.", "error");
     } finally {
       setLoading(button, false);
     }
@@ -283,12 +354,19 @@
 
   restoreSession();
 
-  if (typeof auth.isGoogleAuthAvailable === "function" && !auth.isGoogleAuthAvailable()) {
+  if (
+    typeof auth.isGoogleAuthAvailable === "function" &&
+    typeof auth.isAppleAuthAvailable === "function" &&
+    (!auth.isGoogleAuthAvailable() || !auth.isAppleAuthAvailable())
+  ) {
     var providerLoadAttempts = 0;
     var providerLoadTimer = window.setInterval(function () {
       providerLoadAttempts += 1;
 
-      if (auth.isGoogleAuthAvailable() || providerLoadAttempts >= 20) {
+      if (
+        (auth.isGoogleAuthAvailable() && auth.isAppleAuthAvailable()) ||
+        providerLoadAttempts >= 20
+      ) {
         window.clearInterval(providerLoadTimer);
         restoreSession();
       }
