@@ -144,6 +144,7 @@
       typeof auth.isGoogleAuthAvailable !== "function" ||
       !auth.isGoogleAuthAvailable()
     ) {
+      setGoogleSlotFallback(slot, fallbackLabel, false);
       return false;
     }
 
