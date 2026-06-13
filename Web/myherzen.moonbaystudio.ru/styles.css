@@ -522,6 +522,129 @@ img {
   font-weight: 600;
 }
 
+.profile-page {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.profile-overview,
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.profile-panel {
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--panel-strong);
+  padding: 18px;
+}
+
+.profile-panel h3 {
+  margin: 0 0 14px;
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.profile-summary {
+  grid-column: span 1;
+}
+
+.profile-summary-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.profile-summary-head h3 {
+  margin: 12px 0 6px;
+  font-size: 24px;
+}
+
+.profile-summary-head p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.profile-meta {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.profile-meta div {
+  min-width: 0;
+}
+
+.profile-meta dt {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.profile-meta dd {
+  margin: 0;
+  color: #e8ecfb;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.profile-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.07);
+  color: #edf1ff;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.profile-chip-ok {
+  border-color: rgba(135, 232, 194, 0.3);
+  background: rgba(135, 232, 194, 0.12);
+  color: #bbf7d0;
+}
+
+.profile-chip-accent {
+  border-color: rgba(125, 211, 252, 0.3);
+  background: rgba(125, 211, 252, 0.12);
+  color: #c9f4ff;
+}
+
+.profile-chip-muted {
+  color: var(--muted);
+}
+
+.compact-form {
+  margin-top: 12px;
+}
+
+.toggle-field {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.toggle-field input {
+  width: 22px;
+  min-height: 22px;
+  height: 22px;
+  padding: 0;
+}
+
 .dashboard-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
@@ -929,7 +1052,10 @@ img {
   .contacts-grid,
   .card-grid,
   .auth-grid,
-  .form-grid {
+  .form-grid,
+  .profile-overview,
+  .profile-grid,
+  .profile-meta {
     grid-template-columns: 1fr;
   }
 

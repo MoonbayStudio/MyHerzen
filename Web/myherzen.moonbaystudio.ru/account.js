@@ -24,6 +24,35 @@
   var displayNameEl = document.getElementById("profileDisplayName");
   var emailEl = document.getElementById("profileEmail");
   var userIdEl = document.getElementById("profileUserId");
+  var tierEl = document.getElementById("profileTier");
+  var remainingTodayEl = document.getElementById("profileRemainingToday");
+  var contactEmailEl = document.getElementById("profileContactEmail");
+  var appleEmailEl = document.getElementById("profileAppleEmail");
+  var emailVerifiedEl = document.getElementById("profileEmailVerified");
+  var providersEl = document.getElementById("profileProviders");
+  var rolesEl = document.getElementById("profileRoles");
+  var badgesEl = document.getElementById("profileBadges");
+  var profileNameForm = document.getElementById("profileNameForm");
+  var profileNameInput = document.getElementById("profileNameInput");
+  var emailChangeForm = document.getElementById("emailChangeForm");
+  var newEmailInput = document.getElementById("newEmailInput");
+  var emailConfirmForm = document.getElementById("emailConfirmForm");
+  var emailCodeInput = document.getElementById("emailCodeInput");
+  var emailPendingNote = document.getElementById("emailPendingNote");
+  var passwordForm = document.getElementById("passwordForm");
+  var passwordPanelTitle = document.getElementById("passwordPanelTitle");
+  var currentPasswordLabel = document.getElementById("currentPasswordLabel");
+  var currentPasswordInput = document.getElementById("currentPasswordInput");
+  var newPasswordLabelText = document.getElementById("newPasswordLabelText");
+  var newPasswordInput = document.getElementById("newPasswordInput");
+  var passwordSubmitButton = document.getElementById("passwordSubmitButton");
+  var settingsForm = document.getElementById("settingsForm");
+  var selectedGroupNameInput = document.getElementById("selectedGroupNameInput");
+  var selectedGroupIdInput = document.getElementById("selectedGroupIdInput");
+  var scheduleCacheWeeksInput = document.getElementById("scheduleCacheWeeksInput");
+  var liveActivityInput = document.getElementById("liveActivityInput");
+
+  var currentUser = null;
 
   function setMessage(text, type) {
     if (!messageEl) {
@@ -118,8 +147,8 @@
 
       setGoogleButtonsDisabled(true);
       setMessage("Выполняем вход через Google...");
-      await auth.handleGoogleCredential(response.credential);
-      var user = await auth.fetchCurrentUser();
+      var data = await auth.handleGoogleCredential(response.credential);
+      var user = auth.getUserFromResponse(data) || await auth.fetchCurrentUser();
       renderLoggedIn(user);
     } catch (error) {
       console.error(error);
@@ -181,6 +210,168 @@
     return loginReady && registerReady;
   }
 
+  function valueOrDash(value) {
+    if (value === null || value === undefined || value === "") {
+      return "—";
+    }
+    return String(value);
+  }
+
+  function setText(element, value) {
+    if (element) {
+      element.textContent = valueOrDash(value);
+    }
+  }
+
+  function getErrorDetail(error, fallback) {
+    var data = error && error.data ? error.data : null;
+    if (data && typeof data.detail === "string") {
+      return data.detail;
+    }
+    if (data && typeof data.message === "string") {
+      return data.message;
+    }
+    return fallback;
+  }
+
+  function clearElement(element) {
+    if (element) {
+      element.innerHTML = "";
+    }
+  }
+
+  function appendChip(container, text, variant) {
+    if (!container) {
+      return;
+    }
+
+    var chip = document.createElement("span");
+    chip.className = "profile-chip";
+    if (variant) {
+      chip.classList.add("profile-chip-" + variant);
+    }
+    chip.textContent = text;
+    container.appendChild(chip);
+  }
+
+  function renderChipList(container, items, emptyText, formatter, variant) {
+    clearElement(container);
+
+    if (!container) {
+      return;
+    }
+
+    if (!items || !items.length) {
+      appendChip(container, emptyText, "muted");
+      return;
+    }
+
+    items.forEach(function (item) {
+      appendChip(container, formatter ? formatter(item) : String(item), variant);
+    });
+  }
+
+  function renderProviders(user) {
+    var linked = user && Array.isArray(user.linkedProviders) ? user.linkedProviders : [];
+    var providers = [
+      { id: "apple", title: "Apple" },
+      { id: "google", title: "Google" },
+      { id: "password", title: user && user.hasPassword ? "Пароль задан" : "Пароль не задан" }
+    ];
+
+    clearElement(providersEl);
+    providers.forEach(function (provider) {
+      var isLinked = provider.id === "password" ? !!(user && user.hasPassword) : linked.indexOf(provider.id) !== -1;
+      appendChip(providersEl, provider.title, isLinked ? "ok" : "muted");
+    });
+  }
+
+  function renderSecurityForms(user) {
+    var hasPassword = !!(user && user.hasPassword);
+
+    if (passwordPanelTitle) {
+      passwordPanelTitle.textContent = hasPassword ? "Смена пароля" : "Создать пароль";
+    }
+    if (currentPasswordLabel) {
+      currentPasswordLabel.hidden = !hasPassword;
+    }
+    if (currentPasswordInput) {
+      currentPasswordInput.required = hasPassword;
+      currentPasswordInput.value = "";
+    }
+    if (newPasswordLabelText) {
+      newPasswordLabelText.textContent = hasPassword ? "Новый пароль" : "Пароль";
+    }
+    if (newPasswordInput) {
+      newPasswordInput.value = "";
+      newPasswordInput.autocomplete = hasPassword ? "new-password" : "new-password";
+    }
+    if (passwordSubmitButton) {
+      passwordSubmitButton.textContent = hasPassword ? "Сменить пароль" : "Создать пароль";
+    }
+  }
+
+  function renderProfileDetails(user) {
+    currentUser = user || null;
+
+    setText(displayNameEl, user && user.displayName);
+    setText(emailEl, user && user.email);
+    setText(userIdEl, user && user.id);
+    setText(tierEl, user && user.tier);
+    setText(remainingTodayEl, user && user.remainingToday === -1 ? "Без лимита" : user && user.remainingToday);
+    setText(contactEmailEl, user && user.contactEmail);
+    setText(appleEmailEl, user && user.appleEmail);
+    setText(emailVerifiedEl, user && user.emailVerified ? "Подтверждена" : "Не подтверждена");
+
+    if (profileNameInput) {
+      profileNameInput.value = user && user.displayName ? user.displayName : "";
+    }
+    if (newEmailInput) {
+      newEmailInput.value = "";
+    }
+    if (emailCodeInput) {
+      emailCodeInput.value = "";
+    }
+    if (emailPendingNote) {
+      emailPendingNote.textContent = user && user.pendingEmail
+        ? "Ожидает подтверждения: " + user.pendingEmail
+        : "Новая почта подтверждается кодом.";
+    }
+
+    renderProviders(user);
+    renderSecurityForms(user);
+    renderChipList(rolesEl, user && user.roles, "Ролей пока нет", function (role) {
+      return role && role.title ? role.title : role && role.type ? role.type : "Роль";
+    }, "ok");
+    renderChipList(badgesEl, user && user.badges, "Значков пока нет", function (badge) {
+      return badge && badge.title ? badge.title : badge && badge.code ? badge.code : "Значок";
+    }, "accent");
+  }
+
+  async function loadSettings() {
+    if (typeof auth.getSettings !== "function" || !auth.getToken()) {
+      return;
+    }
+
+    try {
+      var settings = await auth.getSettings();
+      if (selectedGroupNameInput) {
+        selectedGroupNameInput.value = settings && settings.selectedGroupName ? settings.selectedGroupName : "";
+      }
+      if (selectedGroupIdInput) {
+        selectedGroupIdInput.value = settings && settings.selectedGroupId ? settings.selectedGroupId : "";
+      }
+      if (scheduleCacheWeeksInput) {
+        scheduleCacheWeeksInput.value = settings && settings.scheduleCacheWeeks ? settings.scheduleCacheWeeks : 2;
+      }
+      if (liveActivityInput) {
+        liveActivityInput.checked = !settings || settings.liveActivityEnabled !== false;
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
   function renderLoggedOut(message, type) {
     if (loggedOutStateEl) {
       loggedOutStateEl.hidden = false;
@@ -189,30 +380,14 @@
       loggedInStateEl.hidden = true;
     }
 
-    if (displayNameEl) {
-      displayNameEl.textContent = "—";
-    }
-    if (emailEl) {
-      emailEl.textContent = "—";
-    }
-    if (userIdEl) {
-      userIdEl.textContent = "—";
-    }
+    renderProfileDetails(null);
 
     setMessage(message || "Вы не вошли в аккаунт.", type || "info");
     updateNav();
   }
 
   function renderLoggedIn(user) {
-    if (displayNameEl) {
-      displayNameEl.textContent = user && user.displayName ? user.displayName : "—";
-    }
-    if (emailEl) {
-      emailEl.textContent = user && user.email ? user.email : "—";
-    }
-    if (userIdEl) {
-      userIdEl.textContent = user && user.id ? user.id : "—";
-    }
+    renderProfileDetails(user);
 
     if (loggedOutStateEl) {
       loggedOutStateEl.hidden = true;
@@ -223,6 +398,7 @@
 
     setMessage("Профиль загружен.", "success");
     updateNav();
+    loadSettings();
   }
 
   async function handleAuthResult(result, fallbackMessage) {
@@ -327,6 +503,119 @@
           registerPasswordEl.value
         );
         await handleAuthResult(result, "Не удалось создать аккаунт.");
+      } finally {
+        setLoading(submitButton, false);
+      }
+    });
+  }
+
+  if (profileNameForm) {
+    profileNameForm.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      var submitButton = profileNameForm.querySelector('button[type="submit"]');
+
+      try {
+        setLoading(submitButton, true, "Сохраняем...");
+        var user = await auth.updateProfileName(profileNameInput.value);
+        renderLoggedIn(user);
+        setMessage("Имя обновлено.", "success");
+      } catch (error) {
+        console.error(error);
+        setMessage(getErrorDetail(error, "Не удалось сохранить имя."), "error");
+      } finally {
+        setLoading(submitButton, false);
+      }
+    });
+  }
+
+  if (emailChangeForm) {
+    emailChangeForm.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      var submitButton = emailChangeForm.querySelector('button[type="submit"]');
+
+      try {
+        setLoading(submitButton, true, "Отправляем...");
+        await auth.requestEmailChange(newEmailInput.value);
+        if (emailPendingNote) {
+          emailPendingNote.textContent = "Код отправлен на " + newEmailInput.value.trim() + ".";
+        }
+        setMessage("Код подтверждения отправлен.", "success");
+      } catch (error) {
+        console.error(error);
+        setMessage(getErrorDetail(error, "Не удалось отправить код подтверждения."), "error");
+      } finally {
+        setLoading(submitButton, false);
+      }
+    });
+  }
+
+  if (emailConfirmForm) {
+    emailConfirmForm.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      var submitButton = emailConfirmForm.querySelector('button[type="submit"]');
+
+      try {
+        setLoading(submitButton, true, "Проверяем...");
+        var user = await auth.confirmEmailChange(emailCodeInput.value);
+        renderLoggedIn(user);
+        setMessage("Почта обновлена.", "success");
+      } catch (error) {
+        console.error(error);
+        setMessage(getErrorDetail(error, "Не удалось подтвердить почту."), "error");
+      } finally {
+        setLoading(submitButton, false);
+      }
+    });
+  }
+
+  if (passwordForm) {
+    passwordForm.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      var submitButton = passwordForm.querySelector('button[type="submit"]');
+
+      try {
+        setLoading(submitButton, true, "Сохраняем...");
+        if (currentUser && currentUser.hasPassword) {
+          await auth.changePassword(currentPasswordInput.value, newPasswordInput.value);
+        } else {
+          await auth.createPassword(newPasswordInput.value);
+        }
+
+        var user = await auth.fetchCurrentUser();
+        renderLoggedIn(user);
+        setMessage("Пароль сохранён.", "success");
+      } catch (error) {
+        console.error(error);
+        setMessage(getErrorDetail(error, "Не удалось сохранить пароль."), "error");
+      } finally {
+        setLoading(submitButton, false);
+      }
+    });
+  }
+
+  if (settingsForm) {
+    settingsForm.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      var submitButton = settingsForm.querySelector('button[type="submit"]');
+      var groupId = selectedGroupIdInput && selectedGroupIdInput.value
+        ? Number(selectedGroupIdInput.value)
+        : null;
+
+      try {
+        setLoading(submitButton, true, "Сохраняем...");
+        await auth.updateSettings({
+          selectedGroupId: groupId,
+          selectedGroupName: selectedGroupNameInput ? selectedGroupNameInput.value.trim() || null : null,
+          scheduleCacheWeeks: scheduleCacheWeeksInput && scheduleCacheWeeksInput.value
+            ? Number(scheduleCacheWeeksInput.value)
+            : 2,
+          liveActivityEnabled: liveActivityInput ? liveActivityInput.checked : true
+        });
+        await loadSettings();
+        setMessage("Настройки сохранены.", "success");
+      } catch (error) {
+        console.error(error);
+        setMessage(getErrorDetail(error, "Не удалось сохранить настройки."), "error");
       } finally {
         setLoading(submitButton, false);
       }

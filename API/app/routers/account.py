@@ -107,19 +107,25 @@ async def update_settings(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    provided_fields = getattr(
+        data,
+        "model_fields_set",
+        getattr(data, "__fields_set__", set()),
+    )
+
     settings = db.query(UserSettings).filter(UserSettings.user_id == current_user.id).first()
 
     if settings is None:
         settings = UserSettings(user_id=current_user.id)
         db.add(settings)
 
-    if data.selectedGroupId is not None:
+    if "selectedGroupId" in provided_fields:
         settings.selected_group_id = data.selectedGroupId
-    if data.selectedGroupName is not None:
+    if "selectedGroupName" in provided_fields:
         settings.selected_group_name = data.selectedGroupName
-    if data.scheduleCacheWeeks is not None:
+    if "scheduleCacheWeeks" in provided_fields and data.scheduleCacheWeeks is not None:
         settings.schedule_cache_weeks = data.scheduleCacheWeeks
-    if data.liveActivityEnabled is not None:
+    if "liveActivityEnabled" in provided_fields and data.liveActivityEnabled is not None:
         settings.live_activity_enabled = data.liveActivityEnabled
 
     settings.updated_at = datetime.now(timezone.utc)

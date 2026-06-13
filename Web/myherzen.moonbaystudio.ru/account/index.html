@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260613-social-login-2">
+  <link rel="stylesheet" href="styles.css?v=20260613-profile-1">
   <link rel="icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
@@ -62,14 +62,84 @@
           <div id="registerGoogleButton" class="google-button google-signin-slot" aria-label="Зарегистрироваться через Google" data-loading-label="Google Login загружается..." data-fallback-label="Зарегистрироваться через Google"></div>
         </article>
       </div>
-      <div id="loggedInState" class="news-list" hidden>
-        <article class="news-item">
-          <h3>Данные аккаунта</h3>
-          <p><span class="account-label">displayName:</span> <span id="profileDisplayName">—</span></p>
-          <p><span class="account-label">email:</span> <span id="profileEmail">—</span></p>
-          <p><span class="account-label">user id:</span> <span id="profileUserId">—</span></p>
-        </article>
-        <div class="hero-actions"><button type="button" id="logoutButton" class="button secondary">Выйти</button></div>
+      <div id="loggedInState" class="profile-page" hidden>
+        <div class="profile-overview">
+          <article class="profile-panel profile-summary">
+            <div class="profile-summary-head">
+              <div>
+                <span class="badge">Профиль</span>
+                <h3 id="profileDisplayName">—</h3>
+                <p id="profileEmail">—</p>
+              </div>
+              <button type="button" id="logoutButton" class="button secondary">Выйти</button>
+            </div>
+            <dl class="profile-meta">
+              <div><dt>ID</dt><dd id="profileUserId">—</dd></div>
+              <div><dt>Тариф</dt><dd id="profileTier">—</dd></div>
+              <div><dt>Лимит AI сегодня</dt><dd id="profileRemainingToday">—</dd></div>
+              <div><dt>Контактная почта</dt><dd id="profileContactEmail">—</dd></div>
+              <div><dt>Apple Email</dt><dd id="profileAppleEmail">—</dd></div>
+              <div><dt>Подтверждение</dt><dd id="profileEmailVerified">—</dd></div>
+            </dl>
+          </article>
+          <article class="profile-panel">
+            <h3>Привязки</h3>
+            <div id="profileProviders" class="chip-list"></div>
+          </article>
+        </div>
+
+        <div class="profile-grid">
+          <article class="profile-panel">
+            <h3>Имя</h3>
+            <form id="profileNameForm" class="auth-form">
+              <label>Отображаемое имя<input id="profileNameInput" type="text" name="displayName" autocomplete="name" minlength="2" maxlength="40" required></label>
+              <button type="submit" class="button primary">Сохранить имя</button>
+            </form>
+          </article>
+
+          <article class="profile-panel">
+            <h3>Почта</h3>
+            <p id="emailPendingNote" class="form-actions-note">Новая почта подтверждается кодом.</p>
+            <form id="emailChangeForm" class="auth-form">
+              <label>Новая почта<input id="newEmailInput" type="email" name="email" autocomplete="email" required></label>
+              <button type="submit" class="button secondary">Отправить код</button>
+            </form>
+            <form id="emailConfirmForm" class="auth-form compact-form">
+              <label>Код из письма<input id="emailCodeInput" type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="12"></label>
+              <button type="submit" class="button primary">Подтвердить почту</button>
+            </form>
+          </article>
+
+          <article class="profile-panel">
+            <h3 id="passwordPanelTitle">Пароль</h3>
+            <form id="passwordForm" class="auth-form">
+              <label id="currentPasswordLabel">Текущий пароль<input id="currentPasswordInput" type="password" name="currentPassword" autocomplete="current-password"></label>
+              <label id="newPasswordLabel"><span id="newPasswordLabelText">Новый пароль</span><input id="newPasswordInput" type="password" name="newPassword" autocomplete="new-password" minlength="8" required></label>
+              <button id="passwordSubmitButton" type="submit" class="button primary">Сохранить пароль</button>
+            </form>
+          </article>
+
+          <article class="profile-panel">
+            <h3>Группа и настройки</h3>
+            <form id="settingsForm" class="auth-form">
+              <label>Группа по умолчанию<input id="selectedGroupNameInput" type="text" name="selectedGroupName" placeholder="Например: ИВТ-1"></label>
+              <label>ID группы<input id="selectedGroupIdInput" type="number" name="selectedGroupId" min="1" inputmode="numeric"></label>
+              <label>Кэш расписания, недель<input id="scheduleCacheWeeksInput" type="number" name="scheduleCacheWeeks" min="1" max="12"></label>
+              <label class="toggle-field"><input id="liveActivityInput" type="checkbox" name="liveActivityEnabled"> Live Activity включена</label>
+              <button type="submit" class="button primary">Сохранить настройки</button>
+            </form>
+          </article>
+
+          <article class="profile-panel">
+            <h3>Роли</h3>
+            <div id="profileRoles" class="chip-list"></div>
+          </article>
+
+          <article class="profile-panel">
+            <h3>Значки</h3>
+            <div id="profileBadges" class="chip-list"></div>
+          </article>
+        </div>
       </div>
     </section>
   </main>
@@ -92,9 +162,9 @@
   </footer>
   <script type="text/javascript" src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="auth.js?v=20260613-social-login-2"></script>
-  <script src="nav.js?v=20260613-social-login-2"></script>
-  <script src="account.js?v=20260613-social-login-2"></script>
-  <script src="cookies.js?v=20260613-social-login-2"></script>
+  <script src="auth.js?v=20260613-profile-1"></script>
+  <script src="nav.js?v=20260613-profile-1"></script>
+  <script src="account.js?v=20260613-profile-1"></script>
+  <script src="cookies.js?v=20260613-profile-1"></script>
 </body>
 </html>

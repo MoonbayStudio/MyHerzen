@@ -112,6 +112,13 @@
     return null;
   }
 
+  function createAuthError(status, data) {
+    var error = new Error("request_failed");
+    error.status = status;
+    error.data = data;
+    return error;
+  }
+
   async function readJson(response) {
     var text = await response.text();
     if (!text) {
@@ -142,6 +149,39 @@
       error.status = response.status;
       error.data = data;
       throw error;
+    }
+
+    return data;
+  }
+
+  async function requestAuthorizedJson(path, options) {
+    var token = getToken();
+    var requestOptions = options || {};
+    var headers = {
+      Authorization: "Bearer " + token
+    };
+
+    if (!token) {
+      throw createAuthError(401, { detail: "Unauthorized" });
+    }
+
+    if (requestOptions.body !== undefined) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    var response = await fetch(API_BASE + path, {
+      method: requestOptions.method || "GET",
+      headers: headers,
+      body: requestOptions.body !== undefined ? JSON.stringify(requestOptions.body) : undefined
+    });
+    var data = await readJson(response);
+
+    if (response.status === 401) {
+      logout();
+    }
+
+    if (!response.ok) {
+      throw createAuthError(response.status, data);
     }
 
     return data;
@@ -378,28 +418,69 @@
   }
 
   async function fetchCurrentUser() {
-    var token = getToken();
-    if (!token) {
+    if (!getToken()) {
       return null;
     }
 
-    var response = await fetch(API_BASE + "/me", {
-      headers: {
-        Authorization: "Bearer " + token
+    var data = await requestAuthorizedJson("/me");
+    return data && data.user ? data.user : data;
+  }
+
+  function updateProfileName(name) {
+    return requestAuthorizedJson("/me", {
+      method: "PATCH",
+      body: {
+        name: name
       }
     });
+  }
 
-    if (response.status === 401) {
-      logout();
-      return null;
-    }
+  function requestEmailChange(email) {
+    return requestAuthorizedJson("/me/email/change-request", {
+      method: "POST",
+      body: {
+        email: email
+      }
+    });
+  }
 
-    if (!response.ok) {
-      throw new Error("profile_load_failed");
-    }
+  function confirmEmailChange(code) {
+    return requestAuthorizedJson("/me/email/confirm", {
+      method: "POST",
+      body: {
+        code: code
+      }
+    });
+  }
 
-    var data = await response.json();
-    return data && data.user ? data.user : data;
+  function createPassword(password) {
+    return requestAuthorizedJson("/me/password/create", {
+      method: "POST",
+      body: {
+        password: password
+      }
+    });
+  }
+
+  function changePassword(currentPassword, newPassword) {
+    return requestAuthorizedJson("/me/password/change", {
+      method: "POST",
+      body: {
+        currentPassword: currentPassword,
+        newPassword: newPassword
+      }
+    });
+  }
+
+  function getSettings() {
+    return requestAuthorizedJson("/settings");
+  }
+
+  function updateSettings(settings) {
+    return requestAuthorizedJson("/settings", {
+      method: "PUT",
+      body: settings
+    });
   }
 
   async function loginWithApple() {
@@ -424,12 +505,12 @@
       var fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
       var email = appleUser && appleUser.email ? appleUser.email : "";
 
-      await handleAppleCredential(identityToken, {
+      var data = await handleAppleCredential(identityToken, {
         fullName: fullName,
         email: email
       });
 
-      var user = await fetchCurrentUser();
+      var user = getUserFromResponse(data) || await fetchCurrentUser();
 
       return {
         ok: true,
@@ -539,8 +620,8 @@
     return new Promise(function (resolve) {
       var initialized = initGoogleAuth(async function (response) {
         try {
-          await handleGoogleCredential(response.credential);
-          var user = await fetchCurrentUser();
+          var data = await handleGoogleCredential(response.credential);
+          var user = getUserFromResponse(data) || await fetchCurrentUser();
           resolve({
             ok: true,
             message: "Вход выполнен.",
@@ -593,6 +674,15 @@
     registerWithEmail: registerWithEmail,
     handleAppleCredential: handleAppleCredential,
     handleGoogleCredential: handleGoogleCredential,
+    getUserFromResponse: getUserFromResponse,
+    requestAuthorizedJson: requestAuthorizedJson,
+    updateProfileName: updateProfileName,
+    requestEmailChange: requestEmailChange,
+    confirmEmailChange: confirmEmailChange,
+    createPassword: createPassword,
+    changePassword: changePassword,
+    getSettings: getSettings,
+    updateSettings: updateSettings,
     saveToken: saveToken,
     getToken: getToken,
     logout: logout,
