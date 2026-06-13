@@ -45,6 +45,7 @@ def _save_display_name(
     return build_user_response(db=db, user=user)
 
 
+@router.get("/me", response_model=AppleUserResponse)
 @router.get("/profile", response_model=AppleUserResponse)
 async def get_profile(
     current_user: User = Depends(get_current_user),

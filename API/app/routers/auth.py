@@ -690,10 +690,6 @@ async def apple_login(
         if not matching_key:
             raise HTTPException(status_code=401, detail="Apple public key not found")
 
-        unverified_claims = jwt.get_unverified_claims(data.identityToken)
-        print("🍎 Apple token audience:", unverified_claims.get("aud"))
-        print("🍎 Expected audiences:", APPLE_AUDIENCES)
-
         payload = jwt.decode(
             data.identityToken,
             matching_key,

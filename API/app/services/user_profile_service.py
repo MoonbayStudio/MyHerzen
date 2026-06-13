@@ -106,11 +106,4 @@ def build_user_response(db: Session, user: User) -> Dict[str, Any]:
         "linkedProviders": sorted(linked_providers),
     }
 
-    import json
-
-    print(
-        f"DEBUG PROFILE [user={user.id}]: tier={tier}, roles={json.dumps(response['roles'], ensure_ascii=False)}"
-    )
-    print(f"DEBUG PROFILE JSON: {json.dumps(response, ensure_ascii=False)}")
-
     return response
