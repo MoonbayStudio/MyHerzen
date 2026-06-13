@@ -13,7 +13,6 @@
   var registerAppleButton = document.getElementById("registerAppleButton");
   var loginGoogleButton = document.getElementById("loginGoogleButton");
   var registerGoogleButton = document.getElementById("registerGoogleButton");
-  var logoutButton = document.getElementById("logoutButton");
 
   var loginEmailEl = document.getElementById("loginEmail");
   var loginPasswordEl = document.getElementById("loginPassword");
@@ -26,8 +25,6 @@
   var userIdEl = document.getElementById("profileUserId");
   var tierEl = document.getElementById("profileTier");
   var remainingTodayEl = document.getElementById("profileRemainingToday");
-  var contactEmailEl = document.getElementById("profileContactEmail");
-  var appleEmailEl = document.getElementById("profileAppleEmail");
   var emailVerifiedEl = document.getElementById("profileEmailVerified");
   var providersEl = document.getElementById("profileProviders");
   var rolesEl = document.getElementById("profileRoles");
@@ -46,13 +43,9 @@
   var newPasswordLabelText = document.getElementById("newPasswordLabelText");
   var newPasswordInput = document.getElementById("newPasswordInput");
   var passwordSubmitButton = document.getElementById("passwordSubmitButton");
-  var settingsForm = document.getElementById("settingsForm");
-  var selectedGroupNameInput = document.getElementById("selectedGroupNameInput");
-  var selectedGroupIdInput = document.getElementById("selectedGroupIdInput");
-  var scheduleCacheWeeksInput = document.getElementById("scheduleCacheWeeksInput");
-  var liveActivityInput = document.getElementById("liveActivityInput");
 
   var currentUser = null;
+  var currentSettings = null;
 
   function setMessage(text, type) {
     if (!messageEl) {
@@ -290,7 +283,7 @@
     var hasPassword = !!(user && user.hasPassword);
 
     if (passwordPanelTitle) {
-      passwordPanelTitle.textContent = hasPassword ? "Смена пароля" : "Создать пароль";
+      passwordPanelTitle.textContent = hasPassword ? "Сменить пароль" : "Создать пароль";
     }
     if (currentPasswordLabel) {
       currentPasswordLabel.hidden = !hasPassword;
@@ -311,16 +304,37 @@
     }
   }
 
+  function renderRoles(user, settings) {
+    var roles = user && Array.isArray(user.roles) ? user.roles.slice() : [];
+    var groupName = settings && settings.selectedGroupName ? settings.selectedGroupName : "";
+    var groupId = settings && settings.selectedGroupId ? settings.selectedGroupId : "";
+
+    if (groupName || groupId) {
+      roles.push({
+        title: groupName ? "Группа: " + groupName : "Группа #" + groupId
+      });
+    }
+
+    renderChipList(rolesEl, roles, "Ролей пока нет", function (role) {
+      var title = role && role.title ? role.title : role && role.type ? role.type : "Роль";
+      if (role && role.groupId && title.indexOf("Группа") !== 0) {
+        return title + " #" + role.groupId;
+      }
+      return title;
+    }, "ok");
+  }
+
   function renderProfileDetails(user) {
     currentUser = user || null;
+    if (!user) {
+      currentSettings = null;
+    }
 
     setText(displayNameEl, user && user.displayName);
     setText(emailEl, user && user.email);
     setText(userIdEl, user && user.id);
     setText(tierEl, user && user.tier);
     setText(remainingTodayEl, user && user.remainingToday === -1 ? "Без лимита" : user && user.remainingToday);
-    setText(contactEmailEl, user && user.contactEmail);
-    setText(appleEmailEl, user && user.appleEmail);
     setText(emailVerifiedEl, user && user.emailVerified ? "Подтверждена" : "Не подтверждена");
 
     if (profileNameInput) {
@@ -340,9 +354,7 @@
 
     renderProviders(user);
     renderSecurityForms(user);
-    renderChipList(rolesEl, user && user.roles, "Ролей пока нет", function (role) {
-      return role && role.title ? role.title : role && role.type ? role.type : "Роль";
-    }, "ok");
+    renderRoles(user, currentSettings);
     renderChipList(badgesEl, user && user.badges, "Значков пока нет", function (badge) {
       return badge && badge.title ? badge.title : badge && badge.code ? badge.code : "Значок";
     }, "accent");
@@ -354,19 +366,8 @@
     }
 
     try {
-      var settings = await auth.getSettings();
-      if (selectedGroupNameInput) {
-        selectedGroupNameInput.value = settings && settings.selectedGroupName ? settings.selectedGroupName : "";
-      }
-      if (selectedGroupIdInput) {
-        selectedGroupIdInput.value = settings && settings.selectedGroupId ? settings.selectedGroupId : "";
-      }
-      if (scheduleCacheWeeksInput) {
-        scheduleCacheWeeksInput.value = settings && settings.scheduleCacheWeeks ? settings.scheduleCacheWeeks : 2;
-      }
-      if (liveActivityInput) {
-        liveActivityInput.checked = !settings || settings.liveActivityEnabled !== false;
-      }
+      currentSettings = await auth.getSettings();
+      renderRoles(currentUser, currentSettings);
     } catch (error) {
       console.error(error);
     }
@@ -593,35 +594,6 @@
     });
   }
 
-  if (settingsForm) {
-    settingsForm.addEventListener("submit", async function (event) {
-      event.preventDefault();
-      var submitButton = settingsForm.querySelector('button[type="submit"]');
-      var groupId = selectedGroupIdInput && selectedGroupIdInput.value
-        ? Number(selectedGroupIdInput.value)
-        : null;
-
-      try {
-        setLoading(submitButton, true, "Сохраняем...");
-        await auth.updateSettings({
-          selectedGroupId: groupId,
-          selectedGroupName: selectedGroupNameInput ? selectedGroupNameInput.value.trim() || null : null,
-          scheduleCacheWeeks: scheduleCacheWeeksInput && scheduleCacheWeeksInput.value
-            ? Number(scheduleCacheWeeksInput.value)
-            : 2,
-          liveActivityEnabled: liveActivityInput ? liveActivityInput.checked : true
-        });
-        await loadSettings();
-        setMessage("Настройки сохранены.", "success");
-      } catch (error) {
-        console.error(error);
-        setMessage(getErrorDetail(error, "Не удалось сохранить настройки."), "error");
-      } finally {
-        setLoading(submitButton, false);
-      }
-    });
-  }
-
   if (loginAppleButton) {
     loginAppleButton.addEventListener("click", function () {
       handleAppleLogin(loginAppleButton);
@@ -634,13 +606,9 @@
     });
   }
 
-  if (logoutButton) {
-    logoutButton.addEventListener("click", function () {
-      auth.logout();
-      renderLoggedOut("Вы вышли из аккаунта.", "success");
-      updateNav();
-    });
-  }
+  window.addEventListener("myherzen:logout", function () {
+    renderLoggedOut("Вы вышли из аккаунта.", "success");
+  });
 
   restoreSession();
 

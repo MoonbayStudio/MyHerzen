@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=20260613-profile-1">
+  <link rel="stylesheet" href="styles.css?v=20260613-account-ui-1">
   <link rel="icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
@@ -19,25 +19,13 @@
         <img src="img/logo.png" alt="Moonbay Studio">
       </a>
       <nav class="top-nav-actions" aria-label="Навигация">
-        <a class="nav-pill" href="news/">Новости</a> <a class="nav-pill" href="download/">Скачать</a> <a class="nav-pill" href="contacts/">Контакты</a> <a class="nav-pill" href="account/#register" data-auth-link="guest">Регистрация</a> <a class="nav-pill" href="account/#login" data-auth-link="guest">Вход</a> <a class="nav-pill is-active" href="account/" data-auth-link="account" hidden>Аккаунт</a>
+        <a class="nav-pill" href="news/">Новости</a> <a class="nav-pill" href="download/">Скачать</a> <a class="nav-pill" href="contacts/">Контакты</a> <a class="nav-pill" href="account/#register" data-auth-link="guest">Регистрация</a> <a class="nav-pill" href="account/#login" data-auth-link="guest">Вход</a> <a class="nav-pill is-active" href="account/" data-auth-link="account" hidden>Аккаунт</a> <button type="button" class="nav-pill" data-auth-link="account" data-auth-action="logout" hidden>Выйти</button>
       </nav>
     </div>
   </header>
   <main class="container">
-    <section class="hero-card">
-      <div class="hero-copy">
-        <span class="badge">Авторизация</span>
-        <h1>Аккаунт MyHerzen</h1>
-        <p>Войдите по почте и паролю, зарегистрируйте новый профиль или используйте быстрый вход через Apple и Google.</p>
-      </div>
-      <div class="hero-stats">
-        <article class="stat-card"><span class="stat-label">Провайдеры</span><strong class="stat-value">Apple / Google</strong></article>
-        <article class="stat-card"><span class="stat-label">Сессия</span><strong class="stat-value">JWT</strong></article>
-        <article class="stat-card wide"><span class="stat-label">API</span><strong class="stat-value small">api.myherzen.moonbaystudio.ru</strong></article>
-      </div>
-    </section>
-    <section class="panel section-panel">
-      <div class="section-head"><h2>Вход и профиль</h2></div>
+    <section class="panel section-panel account-panel">
+      <div class="section-head account-head"><h1>Аккаунт</h1></div>
       <p id="authMessage" class="auth-message">Проверка авторизации...</p>
       <div id="loggedOutState" class="auth-grid" hidden>
         <article id="login" class="auth-card">
@@ -69,17 +57,12 @@
               <div>
                 <span class="badge">Профиль</span>
                 <h3 id="profileDisplayName">—</h3>
-                <p id="profileEmail">—</p>
               </div>
-              <button type="button" id="logoutButton" class="button secondary">Выйти</button>
             </div>
             <dl class="profile-meta">
               <div><dt>ID</dt><dd id="profileUserId">—</dd></div>
               <div><dt>Тариф</dt><dd id="profileTier">—</dd></div>
               <div><dt>Лимит AI сегодня</dt><dd id="profileRemainingToday">—</dd></div>
-              <div><dt>Контактная почта</dt><dd id="profileContactEmail">—</dd></div>
-              <div><dt>Apple Email</dt><dd id="profileAppleEmail">—</dd></div>
-              <div><dt>Подтверждение</dt><dd id="profileEmailVerified">—</dd></div>
             </dl>
           </article>
           <article class="profile-panel">
@@ -99,6 +82,10 @@
 
           <article class="profile-panel">
             <h3>Почта</h3>
+            <dl class="profile-meta profile-meta-compact">
+              <div><dt>Текущая почта</dt><dd id="profileEmail">—</dd></div>
+              <div><dt>Статус</dt><dd id="profileEmailVerified">—</dd></div>
+            </dl>
             <p id="emailPendingNote" class="form-actions-note">Новая почта подтверждается кодом.</p>
             <form id="emailChangeForm" class="auth-form">
               <label>Новая почта<input id="newEmailInput" type="email" name="email" autocomplete="email" required></label>
@@ -119,23 +106,15 @@
             </form>
           </article>
 
-          <article class="profile-panel">
-            <h3>Группа и настройки</h3>
-            <form id="settingsForm" class="auth-form">
-              <label>Группа по умолчанию<input id="selectedGroupNameInput" type="text" name="selectedGroupName" placeholder="Например: ИВТ-1"></label>
-              <label>ID группы<input id="selectedGroupIdInput" type="number" name="selectedGroupId" min="1" inputmode="numeric"></label>
-              <label>Кэш расписания, недель<input id="scheduleCacheWeeksInput" type="number" name="scheduleCacheWeeks" min="1" max="12"></label>
-              <label class="toggle-field"><input id="liveActivityInput" type="checkbox" name="liveActivityEnabled"> Live Activity включена</label>
-              <button type="submit" class="button primary">Сохранить настройки</button>
-            </form>
-          </article>
+        </div>
 
-          <article class="profile-panel">
+        <div class="profile-lists">
+          <article class="profile-panel profile-list-panel">
             <h3>Роли</h3>
             <div id="profileRoles" class="chip-list"></div>
           </article>
 
-          <article class="profile-panel">
+          <article class="profile-panel profile-list-panel">
             <h3>Значки</h3>
             <div id="profileBadges" class="chip-list"></div>
           </article>
@@ -162,9 +141,9 @@
   </footer>
   <script type="text/javascript" src="https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="auth.js?v=20260613-profile-1"></script>
-  <script src="nav.js?v=20260613-profile-1"></script>
-  <script src="account.js?v=20260613-profile-1"></script>
-  <script src="cookies.js?v=20260613-profile-1"></script>
+  <script src="auth.js?v=20260613-account-ui-1"></script>
+  <script src="nav.js?v=20260613-account-ui-1"></script>
+  <script src="account.js?v=20260613-account-ui-1"></script>
+  <script src="cookies.js?v=20260613-account-ui-1"></script>
 </body>
 </html>
