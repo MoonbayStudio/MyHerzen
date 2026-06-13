@@ -31,7 +31,7 @@
         <p>Войдите по почте и паролю, зарегистрируйте новый профиль или используйте быстрый вход через Apple и Google.</p>
       </div>
       <div class="hero-stats">
-        <article class="stat-card"><span class="stat-label">Провайдеры</span><strong class="stat-value">Apple</strong></article>
+        <article class="stat-card"><span class="stat-label">Провайдеры</span><strong class="stat-value">Apple / Google</strong></article>
         <article class="stat-card"><span class="stat-label">Сессия</span><strong class="stat-value">JWT</strong></article>
         <article class="stat-card wide"><span class="stat-label">API</span><strong class="stat-value small">api.myherzen.moonbaystudio.ru</strong></article>
       </div>
@@ -48,7 +48,7 @@
             <button type="submit" class="button primary">Войти</button>
           </form>
           <button type="button" id="loginAppleButton" class="button secondary apple-button">Войти через Apple</button>
-          <button type="button" id="loginGoogleButton" class="button secondary google-button">Войти через Google</button>
+          <div id="loginGoogleButton" class="google-button google-signin-slot" aria-label="Войти через Google" data-loading-label="Google Login загружается..."></div>
         </article>
         <article id="register" class="auth-card">
           <h3>Регистрация</h3>
@@ -59,7 +59,7 @@
             <button type="submit" class="button primary">Зарегистрироваться</button>
           </form>
           <button type="button" id="registerAppleButton" class="button secondary apple-button">Зарегистрироваться через Apple</button>
-          <button type="button" id="registerGoogleButton" class="button secondary google-button">Зарегистрироваться через Google</button>
+          <div id="registerGoogleButton" class="google-button google-signin-slot" aria-label="Зарегистрироваться через Google" data-loading-label="Google Login загружается..."></div>
         </article>
       </div>
       <div id="loggedInState" class="news-list" hidden>

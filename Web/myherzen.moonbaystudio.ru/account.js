@@ -76,9 +76,51 @@
   function setGoogleButtonsDisabled(disabled) {
     [loginGoogleButton, registerGoogleButton].forEach(function (button) {
       if (button) {
-        button.disabled = disabled;
+        if ("disabled" in button) {
+          button.disabled = disabled;
+        }
+        button.classList.toggle("is-disabled", disabled);
+        button.setAttribute("aria-disabled", disabled ? "true" : "false");
       }
     });
+  }
+
+  async function handleGoogleCredentialResponse(response) {
+    try {
+      if (!response || typeof response.credential !== "string") {
+        throw new Error("missing_google_credential");
+      }
+
+      setGoogleButtonsDisabled(true);
+      setMessage("Выполняем вход через Google...");
+      await auth.handleGoogleCredential(response.credential);
+      var user = await auth.fetchCurrentUser();
+      renderLoggedIn(user);
+    } catch (error) {
+      console.error(error);
+      setMessage("Не удалось войти через Google.", "error");
+    } finally {
+      setGoogleButtonsDisabled(false);
+    }
+  }
+
+  function renderGoogleButtons() {
+    if (typeof auth.renderGoogleButton !== "function") {
+      return false;
+    }
+
+    var loginReady = !loginGoogleButton || auth.renderGoogleButton(
+      loginGoogleButton,
+      handleGoogleCredentialResponse,
+      { text: "signin_with" }
+    );
+    var registerReady = !registerGoogleButton || auth.renderGoogleButton(
+      registerGoogleButton,
+      handleGoogleCredentialResponse,
+      { text: "signup_with" }
+    );
+
+    return loginReady && registerReady;
   }
 
   function renderLoggedOut(message, type) {
@@ -142,21 +184,7 @@
     var appleReady = typeof auth.initAppleAuth === "function" ? auth.initAppleAuth() : false;
     setAppleButtonsDisabled(!appleReady);
 
-    // Google one-tap init
-    var googleReady = false;
-    if (typeof auth.initGoogleAuth === "function") {
-        googleReady = auth.initGoogleAuth(async function(response) {
-            try {
-                setMessage("Выполняем вход через Google...");
-                var result = await auth.handleGoogleCredential(response.credential);
-                var user = await auth.fetchCurrentUser();
-                renderLoggedIn(user);
-            } catch (error) {
-                console.error(error);
-                setMessage("Не удалось войти через Google.", "error");
-            }
-        });
-    }
+    var googleReady = renderGoogleButtons();
     setGoogleButtonsDisabled(!googleReady);
 
     var token = auth.getToken();
@@ -197,19 +225,6 @@
     } finally {
       setLoading(button, false);
     }
-  }
-
-  async function handleGoogleLogin(button) {
-      try {
-          setLoading(button, true, "Открываем Google...");
-          var result = await auth.loginWithGoogle();
-          await handleAuthResult(result, "Не удалось выполнить вход через Google.");
-      } catch (error) {
-          console.error(error);
-          setMessage("Не удалось начать вход через Google.", "error");
-      } finally {
-          setLoading(button, false);
-      }
   }
 
   if (loginForm) {
@@ -258,18 +273,6 @@
     });
   }
 
-  if (loginGoogleButton) {
-    loginGoogleButton.addEventListener("click", function () {
-        handleGoogleLogin(loginGoogleButton);
-    });
-  }
-
-  if (registerGoogleButton) {
-    registerGoogleButton.addEventListener("click", function () {
-        handleGoogleLogin(registerGoogleButton);
-    });
-  }
-
   if (logoutButton) {
     logoutButton.addEventListener("click", function () {
       auth.logout();
@@ -278,10 +281,17 @@
     });
   }
 
-  // Wait for Google script to load if it hasn't yet
-  if (typeof google === 'undefined') {
-      window.addEventListener('load', restoreSession);
-  } else {
-      restoreSession();
+  restoreSession();
+
+  if (typeof auth.isGoogleAuthAvailable === "function" && !auth.isGoogleAuthAvailable()) {
+    var providerLoadAttempts = 0;
+    var providerLoadTimer = window.setInterval(function () {
+      providerLoadAttempts += 1;
+
+      if (auth.isGoogleAuthAvailable() || providerLoadAttempts >= 20) {
+        window.clearInterval(providerLoadTimer);
+        restoreSession();
+      }
+    }, 250);
   }
 })();

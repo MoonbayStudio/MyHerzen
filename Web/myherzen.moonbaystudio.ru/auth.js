@@ -4,11 +4,13 @@
   var APPLE_CLIENT_CONFIG = {
     clientId: "ru.moonbaystudio.myherzen.web",
     scope: "name email",
-    redirectURI: "https://myherzen.moonbaystudio.ru/account",
+    redirectURI: "https://myherzen.moonbaystudio.ru/account/",
     usePopup: true
   };
   var GOOGLE_CLIENT_ID = "295307918338-v06h8kfncsi65plqte80laqe7rqj4vt4.apps.googleusercontent.com";
   var isAppleInitialized = false;
+  var isGoogleInitialized = false;
+  var googleCredentialCallback = null;
 
   function setCookie(name, value, days) {
     var expires = "";
@@ -443,14 +445,72 @@
     }
   }
 
+  function getGoogleIdApi() {
+    if (
+      typeof window.google === "undefined" ||
+      !window.google.accounts ||
+      !window.google.accounts.id
+    ) {
+      return null;
+    }
+
+    return window.google.accounts.id;
+  }
+
+  function isGoogleAuthAvailable() {
+    return !!getGoogleIdApi();
+  }
+
   function initGoogleAuth(callback) {
-    if (typeof google === "undefined" || !google.accounts || !google.accounts.id) {
+    var googleIdApi = getGoogleIdApi();
+
+    if (!googleIdApi) {
       return false;
     }
 
-    google.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
-      callback: callback
+    googleCredentialCallback = typeof callback === "function" ? callback : null;
+
+    if (!isGoogleInitialized) {
+      googleIdApi.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: function (response) {
+          if (typeof googleCredentialCallback === "function") {
+            googleCredentialCallback(response);
+          }
+        },
+        auto_select: false
+      });
+      isGoogleInitialized = true;
+    }
+
+    return true;
+  }
+
+  function renderGoogleButton(container, callback, options) {
+    if (!container || !initGoogleAuth(callback)) {
+      return false;
+    }
+
+    var googleIdApi = getGoogleIdApi();
+    var rect = typeof container.getBoundingClientRect === "function" ? container.getBoundingClientRect() : null;
+    var width = rect && rect.width ? Math.floor(rect.width) : 320;
+
+    if (width < 220) {
+      width = 320;
+    }
+
+    container.innerHTML = "";
+    container.classList.remove("is-disabled");
+    container.setAttribute("aria-disabled", "false");
+
+    googleIdApi.renderButton(container, {
+      type: "standard",
+      theme: "outline",
+      size: "large",
+      text: options && options.text ? options.text : "signin_with",
+      shape: "pill",
+      logo_alignment: "left",
+      width: Math.min(width, 400)
     });
 
     return true;
@@ -484,13 +544,29 @@
         return;
       }
 
-      google.accounts.id.prompt();
+      var googleIdApi = getGoogleIdApi();
+      googleIdApi.prompt(function (notification) {
+        if (
+          notification &&
+          (
+            notification.isNotDisplayed && notification.isNotDisplayed() ||
+            notification.isSkippedMoment && notification.isSkippedMoment()
+          )
+        ) {
+          resolve({
+            ok: false,
+            message: "Google Login не открылся. Используйте кнопку Google на странице."
+          });
+        }
+      });
     });
   }
 
   window.MyHerzenAuth = {
     initAppleAuth: initAppleAuth,
     initGoogleAuth: initGoogleAuth,
+    isGoogleAuthAvailable: isGoogleAuthAvailable,
+    renderGoogleButton: renderGoogleButton,
     loginWithApple: loginWithApple,
     loginWithGoogle: loginWithGoogle,
     loginWithEmail: loginWithEmail,

@@ -481,6 +481,38 @@ img {
   margin-top: 12px;
 }
 
+.google-signin-slot {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.google-signin-slot > div,
+.google-signin-slot iframe {
+  max-width: 100%;
+}
+
+.google-signin-slot.is-disabled {
+  pointer-events: none;
+  opacity: 0.58;
+}
+
+.google-signin-slot.is-disabled:empty::before {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.07);
+  color: #edf1ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  content: attr(data-loading-label);
+  font-size: 14px;
+  font-weight: 700;
+}
+
 .account-label {
   color: #e8ecfb;
   font-weight: 600;
