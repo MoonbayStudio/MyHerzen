@@ -1461,7 +1461,11 @@ struct AccountView: View {
 
     private func validateAppleCredentialIfNeeded() {
         guard isSignedIn, !appleUserID.isEmpty else { return }
-        ASAuthorizationAppleIDProvider().getCredentialState(forUserID: appleUserID) { state, _ in
+        ASAuthorizationAppleIDProvider().getCredentialState(forUserID: appleUserID) { state, error in
+            if let error {
+                print("[AccountView] Apple credential state check failed: \(error)")
+                return
+            }
             guard state == .revoked || state == .notFound else { return }
             DispatchQueue.main.async {
                 signOut()

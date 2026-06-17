@@ -63,20 +63,15 @@ struct MyHerzenApp: App {
     @AppStorage("isDarkMode") private var isDarkMode = false
     @AppStorage("selectedThemeID") private var selectedThemeID = AppThemeCatalog.default
 
-    init() {
-#if os(iOS)
-        ScheduleLiveActivityBackgroundScheduler.shared.register()
-#endif
-    }
-
     var body: some Scene {
         WindowGroup {
             Group {
                 if showLaunch {
-                    LaunchView(viewModel: scheduleViewModel)
-                        .onDisappear {
+                    LaunchView {
+                        withAnimation(.easeInOut(duration: 0.2)) {
                             showLaunch = false
                         }
+                    }
                 } else {
                     ContentView(viewModel: scheduleViewModel)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)

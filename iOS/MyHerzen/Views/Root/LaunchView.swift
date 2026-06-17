@@ -8,72 +8,83 @@
 import SwiftUI
 
 struct LaunchView: View {
-    @State private var showContent = false
-    @State private var animateGlass = false
     @State private var showLogo = false
-    @ObservedObject var viewModel: ScheduleViewModel
+    @AppStorage("useSystemTheme") private var useSystemTheme = true
+    @AppStorage("isDarkMode") private var isDarkMode = false
+    @AppStorage("selectedThemeID") private var selectedThemeID = AppThemeCatalog.default
+
+    let onFinished: () -> Void
+
     var body: some View {
-        if showContent {
-            ContentView(viewModel: viewModel)
-        } else {
+        ZStack {
+            ThemedBackground(theme: activeTheme)
+                .ignoresSafeArea()
+
             ZStack {
-#if os(iOS)
-                Color(.systemBackground).ignoresSafeArea()
-#elseif os(macOS)
-                Color(NSColor.windowBackgroundColor).ignoresSafeArea()
-#endif
-                ZStack {
-                    VStack(spacing: 12) {
-                        Image("herzenicon") // замените на логотип
-                            .resizable()
-                            .frame(width: 200, height: 200)
-                            .foregroundColor(.white)
-                            .opacity(showLogo ? 1 : 0)
-                            .animation(.easeIn(duration: 0.5), value: showLogo)
+                VStack(spacing: 12) {
+                    Image("herzenicon")
+                        .resizable()
+                        .frame(width: 200, height: 200)
+                        .foregroundColor(.white)
+                        .opacity(showLogo ? 1 : 0)
+                        .animation(.easeIn(duration: 0.5), value: showLogo)
 
-                        Text("Добро пожаловать")
-                            .font(.system(size: 32, weight: .bold))
-                            .foregroundColor(Color(hex: "264796"))
-                            .opacity(showLogo ? 1 : 0)
-                            .animation(.easeIn(duration: 0.5), value: showLogo)
+                    Text("Добро пожаловать")
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundColor(launchTextColor)
+                        .opacity(showLogo ? 1 : 0)
+                        .animation(.easeIn(duration: 0.5), value: showLogo)
 
-                        Text("в Твой Герцена")
-                            .font(.system(size: 24))
-                            .foregroundColor(Color(hex: "264796"))
-                            .opacity(showLogo ? 1 : 0)
-                            .animation(.easeIn(duration: 0.5), value: showLogo)
-                    }
-                    VStack {
-                        Spacer()
-                                          
-                        Text("При поддержке Flash Up Energy")
-                            .font(.system(size: 12))
-                            .foregroundColor(Color(hex: "264796"))
-                            .opacity(showLogo ? 1 : 0)
-                            .animation(.easeIn(duration: 0.5), value: showLogo)
-                            .padding(.bottom, 20)
-                        
-                        Text("Версия 0.9 альфа")
-                            .font(.system(size: 12))
-                            .foregroundColor(Color(hex: "264796"))
-                            .opacity(showLogo ? 1 : 0)
-                            .animation(.easeIn(duration: 0.5), value: showLogo)
-                            .padding(.bottom, 20)
-                    }
+                    Text("в Твой Герцена")
+                        .font(.system(size: 24))
+                        .foregroundColor(launchTextColor)
+                        .opacity(showLogo ? 1 : 0)
+                        .animation(.easeIn(duration: 0.5), value: showLogo)
                 }
-            }
-            .onAppear {
-                showLogo = true
-                Task {
-                    await UserSettingsSyncService.syncRemoteSettingsIfAuthenticated()
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                    withAnimation {
-                        showContent = true
-                    }
+                VStack {
+                    Spacer()
+
+                    Text("При поддержке Flash Up Energy")
+                        .font(.system(size: 12))
+                        .foregroundColor(launchTextColor)
+                        .opacity(showLogo ? 1 : 0)
+                        .animation(.easeIn(duration: 0.5), value: showLogo)
+                        .padding(.bottom, 20)
+
+                    Text("Версия 0.9 альфа")
+                        .font(.system(size: 12))
+                        .foregroundColor(launchTextColor)
+                        .opacity(showLogo ? 1 : 0)
+                        .animation(.easeIn(duration: 0.5), value: showLogo)
+                        .padding(.bottom, 20)
                 }
             }
         }
+        .preferredColorScheme(activeColorScheme)
+        .onAppear {
+            showLogo = true
+            Task {
+                await UserSettingsSyncService.syncRemoteSettingsIfAuthenticated()
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                onFinished()
+            }
+        }
+    }
+
+    private var activeTheme: AppTheme {
+        AppThemeCatalog.theme(for: selectedThemeID)
+    }
+
+    private var activeColorScheme: ColorScheme? {
+        if let forced = activeTheme.preferredColorScheme {
+            return forced
+        }
+        return useSystemTheme ? nil : (isDarkMode ? .dark : .light)
+    }
+
+    private var launchTextColor: Color {
+        activeColorScheme == .dark ? .white : Color(hex: "264796")
     }
 }
 

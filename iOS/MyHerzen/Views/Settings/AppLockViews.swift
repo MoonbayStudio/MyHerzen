@@ -156,7 +156,8 @@ struct AppLockGateView: View {
     }
 
     private func unlockWithPasscode() {
-        guard lockManager.unlock(with: passcode) else {
+        let trimmedPasscode = passcode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard lockManager.unlock(with: trimmedPasscode) else {
             errorMessage = "Неверный код."
             passcode = ""
             return

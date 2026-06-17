@@ -19,9 +19,16 @@
 		</array>
 		<key>NSFaceIDUsageDescription</key>
 		<string>MyHerzen использует Face ID для разблокировки приложения.</string>
+		<key>UIApplicationSceneManifest</key>
+		<dict>
+			<key>UIApplicationSupportsMultipleScenes</key>
+			<false/>
+		</dict>
 		<key>UIBackgroundModes</key>
 		<array>
 			<string>fetch</string>
 		</array>
+		<key>UILaunchScreen</key>
+		<dict/>
 	</dict>
 </plist>

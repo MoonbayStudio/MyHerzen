@@ -50,6 +50,7 @@ final class LiveActivityManager {
     ) {
         guard #available(iOS 16.1, *) else { return }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
+        ScheduleLiveActivityBackgroundScheduler.shared.register()
 
         let state = MyHerzenLiveActivityAttributes.ContentState(
             lessonTitle: lessonTitle,
