@@ -9,6 +9,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import ru.moonbaystudio.myherzen.MainActivity
 import ru.moonbaystudio.myherzen.R
 import ru.moonbaystudio.myherzen.data.local.preferences.UserPreferences
@@ -36,15 +37,26 @@ class ScheduleLiveService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Start foreground immediately to avoid crash
+        val initialNotification = buildNotification(ScheduleLiveState.NoCache)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(NOTIFICATION_ID, initialNotification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else {
+            startForeground(NOTIFICATION_ID, initialNotification)
+        }
+
         updateNotification()
         return START_STICKY
     }
 
     private fun updateNotification() {
         serviceScope.launch {
-            val groupId = userPreferences.selectedGroupId.first() ?: return@launch
+            val groupId = userPreferences.selectedGroupId.first() ?: run {
+                stopSelf()
+                return@launch
+            }
             val enabled = userPreferences.liveActivityEnabled.first()
-            
+
             if (!enabled) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                     stopForeground(STOP_FOREGROUND_REMOVE)
@@ -57,12 +69,9 @@ class ScheduleLiveService : Service() {
 
             val state = stateManager.getCurrentState(groupId)
             val notification = buildNotification(state)
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
-            }
+
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.notify(NOTIFICATION_ID, notification)
 
             // Schedule next update
             scheduleNextUpdate(state)
@@ -125,7 +134,7 @@ class ScheduleLiveService : Service() {
         // If we want smooth progress, we update every minute during a lesson
         // But instructions say "Без запросов каждую минуту" - refers to API.
         // For UI, we can update every minute locally.
-        
+
         if (state is ScheduleLiveState.Lesson) {
             nextUpdateTime = now + 60000 // 1 minute
         } else {

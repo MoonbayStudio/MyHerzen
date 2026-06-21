@@ -2,7 +2,7 @@ import ActivityKit
 import WidgetKit
 import SwiftUI
 
-@available(iOS 16.1, *)
+@available(iOSApplicationExtension 16.1, *)
 struct MyHerzenLiveActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
         var lessonTitle: String
@@ -19,7 +19,7 @@ struct MyHerzenLiveActivityAttributes: ActivityAttributes {
     var groupName: String
 }
 
-@available(iOS 16.1, *)
+@available(iOSApplicationExtension 16.1, *)
 struct MyHerzenWidgetLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: MyHerzenLiveActivityAttributes.self) { context in

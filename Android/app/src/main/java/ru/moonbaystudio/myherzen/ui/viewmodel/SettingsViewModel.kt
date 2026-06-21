@@ -4,14 +4,17 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import ru.moonbaystudio.myherzen.data.local.preferences.UserPreferences
+import ru.moonbaystudio.myherzen.data.repository.ScheduleRepository
 import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val repository: ScheduleRepository
 ) : ViewModel() {
     val defaultPersona = userPreferences.defaultPersona.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "pelikasha")
     val selectedGroupName = userPreferences.selectedGroupName.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -36,6 +39,10 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun clearCache() {
-        // TODO: Implement cache clearing
+        viewModelScope.launch {
+            userPreferences.selectedGroupId.first()?.let { groupId ->
+                repository.clearCache(groupId)
+            }
+        }
     }
 }

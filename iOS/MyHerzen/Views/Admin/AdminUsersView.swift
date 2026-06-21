@@ -245,6 +245,9 @@ struct AdminUsersView: View {
     var toolbarTitle: Binding<String>? = nil
     var toolbarShowsBackButton: Binding<Bool>? = nil
     var toolbarBackRequest: Binding<Int>? = nil
+    var toolbarShowsRefreshButton: Binding<Bool>? = nil
+    var toolbarRefreshRequest: Binding<Int>? = nil
+    @ObservedObject var scheduleViewModel: ScheduleViewModel
 
     private enum AdminScreen: Equatable {
         case root
@@ -311,6 +314,10 @@ struct AdminUsersView: View {
         .onChange(of: currentScreen) { _ in
             syncToolbarNavigationState()
         }
+        .onChange(of: toolbarRefreshRequest?.wrappedValue ?? 0) { _ in
+            guard toolbarRefreshRequest != nil, currentScreen == .root else { return }
+            Task { await viewModel.loadAll() }
+        }
         .onChange(of: toolbarBackRequest?.wrappedValue ?? 0) { _ in
             guard toolbarBackRequest != nil else { return }
             if currentScreen == .root {
@@ -363,11 +370,23 @@ struct AdminUsersView: View {
                 rootContent
             }
         case .moderation:
-            ModerationRoleRequestsView(onBack: triggerAdminBackNavigation)
+            ModerationRoleRequestsView(
+                onBack: triggerAdminBackNavigation,
+                toolbarRefreshRequest: toolbarRefreshRequest
+            )
         case .settings:
-            AdminRuntimeSettingsView(activeTheme: activeTheme, onBack: triggerAdminBackNavigation)
+            AdminRuntimeSettingsView(
+                activeTheme: activeTheme,
+                scheduleViewModel: scheduleViewModel,
+                onBack: triggerAdminBackNavigation,
+                toolbarRefreshRequest: toolbarRefreshRequest
+            )
         case .notices:
-            AdminSystemNoticesView(activeTheme: activeTheme, onBack: triggerAdminBackNavigation)
+            AdminSystemNoticesView(
+                activeTheme: activeTheme,
+                onBack: triggerAdminBackNavigation,
+                toolbarRefreshRequest: toolbarRefreshRequest
+            )
         }
     }
 
@@ -411,17 +430,15 @@ struct AdminUsersView: View {
         )
     }
 
+    @ViewBuilder
     private var header: some View {
-        HStack(spacing: 10) {
 #if os(iOS)
+        HStack(spacing: 10) {
             MyHerzenTitleBackHeader(shape: activeTheme.headerShape, title: "Админка") {
                 close()
             }
 
             Spacer(minLength: 0)
-#else
-            Spacer(minLength: 0)
-#endif
 
             ThemedChrome(shape: activeTheme.headerShape) {
                 Button {
@@ -441,6 +458,9 @@ struct AdminUsersView: View {
                 .accessibilityLabel("Обновить")
             }
         }
+#else
+        EmptyView()
+#endif
     }
 
     private var adminManagementEntries: some View {
@@ -449,7 +469,7 @@ struct AdminUsersView: View {
                 openAdminScreen(.settings)
             } label: {
                 HStack {
-                    Label("Настройки", systemImage: "slider.horizontal.3")
+                    Label("Дебаг", systemImage: "ladybug.fill")
                     Spacer()
                     Image(systemName: "chevron.right")
                         .foregroundColor(.secondary)
@@ -503,8 +523,8 @@ struct AdminUsersView: View {
         adminScreenDragOffset = 0
         withAnimation(.easeInOut(duration: 0.18)) {
             currentScreen = screen
+            syncToolbarNavigationState(screen)
         }
-        syncToolbarNavigationState(screen)
     }
 
     private func triggerAdminBackNavigation() {
@@ -530,7 +550,9 @@ struct AdminUsersView: View {
                     viewModel.selectedUser = nil
                 }
             }
-            syncToolbarNavigationState(.root)
+            withAnimation(.easeInOut(duration: 0.18)) {
+                syncToolbarNavigationState(.root)
+            }
         }
     }
 
@@ -538,6 +560,7 @@ struct AdminUsersView: View {
         let current = screen ?? currentScreen
         toolbarTitle?.wrappedValue = toolbarTitle(for: current)
         toolbarShowsBackButton?.wrappedValue = true
+        toolbarShowsRefreshButton?.wrappedValue = current != .roleEditor
     }
 
     private func toolbarTitle(for screen: AdminScreen) -> String {
@@ -549,7 +572,7 @@ struct AdminUsersView: View {
         case .moderation:
             return "Модерация ролей"
         case .settings:
-            return "Настройки"
+            return "Дебаг"
         case .notices:
             return "Уведомления"
         }

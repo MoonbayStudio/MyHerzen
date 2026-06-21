@@ -173,7 +173,7 @@ fun AccountScreen(
                     AccountOption(icon = Icons.Default.Person, title = "Моя группа", onClick = { onNavigate("group_members") })
 
                     if (currentUser?.isAdmin == true || currentUser?.isModerator == true) {
-                        AccountOption(icon = Icons.Default.Settings, title = "Панель администратора", onClick = { onNavigate("admin_panel") })
+                        AccountOption(icon = Icons.Default.Settings, title = "Админка", onClick = { onNavigate("admin") })
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))

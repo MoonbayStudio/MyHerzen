@@ -70,8 +70,10 @@ struct GroupSelectionView: View {
         .padding(.horizontal, 16)
         .padding(.top, 16)
         .background(ThemedBackground(theme: activeTheme).ignoresSafeArea())
-        .task {
-            await loadGroups()
+        .onAppear {
+            Task {
+                await loadGroups()
+            }
         }
     }
 

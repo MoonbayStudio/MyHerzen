@@ -173,7 +173,7 @@ fun AppNavigation(selectedGroupId: Int?) {
             composable("profile_editor") {
                 ProfileEditorScreen(onBack = { navController.popBackStack() })
             }
-            composable("admin_panel") {
+            composable("admin") {
                 AdminPanelScreen(
                     onBack = { navController.popBackStack() }
                 )

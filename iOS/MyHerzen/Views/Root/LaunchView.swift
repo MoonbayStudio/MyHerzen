@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct LaunchView: View {
+    @Environment(\.colorScheme) private var systemColorScheme
     @State private var showLogo = false
     @AppStorage("useSystemTheme") private var useSystemTheme = true
     @AppStorage("isDarkMode") private var isDarkMode = false
@@ -22,7 +23,7 @@ struct LaunchView: View {
 
             ZStack {
                 VStack(spacing: 12) {
-                    Image("herzenicon")
+                    Image(launchIconName)
                         .resizable()
                         .frame(width: 200, height: 200)
                         .foregroundColor(.white)
@@ -84,7 +85,15 @@ struct LaunchView: View {
     }
 
     private var launchTextColor: Color {
-        activeColorScheme == .dark ? .white : Color(hex: "264796")
+        isLaunchDarkMode ? .white : Color(hex: "264796")
+    }
+
+    private var launchIconName: String {
+        isLaunchDarkMode ? "herzenicondark" : "herzenicon"
+    }
+
+    private var isLaunchDarkMode: Bool {
+        activeColorScheme == .dark || (activeColorScheme == nil && systemColorScheme == .dark)
     }
 }
 

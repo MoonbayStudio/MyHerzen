@@ -103,6 +103,7 @@ struct MyHerzenApp: App {
 #if os(macOS)
             .onAppear {
                 updateSystemAppearance()
+                updateMacApplicationIcon()
                 subscribeToSystemThemeChanges()
             }
             .onDisappear {
@@ -110,12 +111,15 @@ struct MyHerzenApp: App {
             }
             .onChange(of: useSystemTheme) { _ in
                 updateSystemAppearance()
+                updateMacApplicationIcon()
                 forceWindowAppearanceUpdate()
             }
             .onChange(of: isDarkMode) { _ in
+                updateMacApplicationIcon()
                 forceWindowAppearanceUpdate()
             }
             .onChange(of: selectedThemeID) { _ in
+                updateMacApplicationIcon()
                 forceWindowAppearanceUpdate()
             }
             .ignoresSafeArea(.container, edges: .top)
@@ -157,6 +161,7 @@ struct MyHerzenApp: App {
             queue: .main
         ) { _ in
             updateSystemAppearance()
+            updateMacApplicationIcon()
             forceWindowAppearanceUpdate()
         }
     }
@@ -175,6 +180,43 @@ struct MyHerzenApp: App {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
             applyAppearanceToAllWindows()
         }
+    }
+
+    private func updateMacApplicationIcon() {
+        DispatchQueue.main.async {
+            guard activeColorScheme == .dark else {
+                NSApplication.shared.applicationIconImage = nil
+                return
+            }
+
+            guard let darkIcon = NSImage(named: "Icon-iOS-Dark-1024x1024") else {
+                NSApplication.shared.applicationIconImage = nil
+                return
+            }
+
+            NSApplication.shared.applicationIconImage = roundedMacApplicationIcon(from: darkIcon)
+        }
+    }
+
+    private func roundedMacApplicationIcon(from sourceImage: NSImage) -> NSImage {
+        let side = max(sourceImage.size.width, sourceImage.size.height, 1024)
+        let size = NSSize(width: side, height: side)
+        let rect = NSRect(origin: .zero, size: size)
+        let contentInset = side * 0.075
+        let contentRect = rect.insetBy(dx: contentInset, dy: contentInset)
+        let cornerRadius = contentRect.width * 0.24
+        let output = NSImage(size: size)
+
+        output.lockFocus()
+        NSColor.clear.setFill()
+        rect.fill()
+
+        NSGraphicsContext.current?.imageInterpolation = .high
+        NSBezierPath(roundedRect: contentRect, xRadius: cornerRadius, yRadius: cornerRadius).addClip()
+        sourceImage.draw(in: contentRect, from: .zero, operation: .sourceOver, fraction: 1)
+        output.unlockFocus()
+
+        return output
     }
 
     private func applyAppearanceToAllWindows() {

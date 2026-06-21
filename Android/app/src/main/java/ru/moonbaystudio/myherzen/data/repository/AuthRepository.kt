@@ -6,7 +6,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import ru.moonbaystudio.myherzen.data.local.preferences.UserPreferences
-import ru.moonbaystudio.myherzen.data.remote.*
+import ru.moonbaystudio.myherzen.data.remote.MyHerzenApiService
+import ru.moonbaystudio.myherzen.data.remote.dto.*
+import ru.moonbaystudio.myherzen.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,75 +23,48 @@ class AuthRepository @Inject constructor(
     val isLoggedIn = userPreferences.authToken.map { it != null }
 
     suspend fun login(email: String, password: String): Result<Unit> {
-        return try {
-            val deviceIdValue = userPreferences.deviceId.first()
-            val request = PasswordLoginRequest(
-                email = email,
-                password = password,
-                deviceId = deviceIdValue,
-                deviceName = android.os.Build.MODEL,
-                appVersion = "1.0"
-            )
-            val response = apiService.login(request)
-            if (response.isSuccessful) {
-                response.body()?.let { body ->
-                    userPreferences.saveAuthToken(body.token)
-                    _currentUser.value = body.user
-                    Result.success(Unit)
-                } ?: Result.failure(Exception("Empty response body"))
-            } else {
-                Result.failure(Exception("Login failed: ${response.code()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
+        val deviceIdValue = userPreferences.deviceId.first()
+        val request = PasswordLoginRequest(
+            email = email,
+            password = password,
+            deviceId = deviceIdValue,
+            deviceName = android.os.Build.MODEL,
+            appVersion = "1.0"
+        )
+        return safeApiCall { apiService.login(request) }.toResult().map { body ->
+            userPreferences.saveAuthToken(body.token)
+            _currentUser.value = body.user
+            Unit
         }
     }
 
     suspend fun googleLogin(idToken: String): Result<Unit> {
-        return try {
-            val deviceIdValue = userPreferences.deviceId.first()
-            val request = GoogleLoginRequest(
-                idToken = idToken,
-                deviceId = deviceIdValue,
-                deviceName = android.os.Build.MODEL,
-                appVersion = "1.0",
-                systemVersion = android.os.Build.VERSION.RELEASE
-            )
-            val response = apiService.googleLogin(request)
-            if (response.isSuccessful) {
-                response.body()?.let { body ->
-                    userPreferences.saveAuthToken(body.token)
-                    _currentUser.value = body.user
-                    Result.success(Unit)
-                } ?: Result.failure(Exception("Empty body"))
-            } else {
-                Result.failure(Exception("Google login failed: ${response.code()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
+        val deviceIdValue = userPreferences.deviceId.first()
+        val request = GoogleLoginRequest(
+            idToken = idToken,
+            deviceId = deviceIdValue,
+            deviceName = android.os.Build.MODEL,
+            appVersion = "1.0",
+            systemVersion = android.os.Build.VERSION.RELEASE
+        )
+        return safeApiCall { apiService.googleLogin(request) }.toResult().map { body ->
+            userPreferences.saveAuthToken(body.token)
+            _currentUser.value = body.user
+            Unit
         }
     }
 
     suspend fun linkGoogle(idToken: String): Result<AppleUser> {
-        return try {
-            val deviceIdValue = userPreferences.deviceId.first()
-            val request = GoogleLoginRequest(
-                idToken = idToken,
-                deviceId = deviceIdValue,
-                deviceName = android.os.Build.MODEL,
-                appVersion = "1.0",
-                systemVersion = android.os.Build.VERSION.RELEASE
-            )
-            val response = apiService.linkGoogle(request)
-            if (response.isSuccessful) {
-                val user = response.body()!!
-                _currentUser.value = user
-                Result.success(user)
-            } else {
-                Result.failure(Exception("Google link failed: ${response.code()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
+        val deviceIdValue = userPreferences.deviceId.first()
+        val request = GoogleLoginRequest(
+            idToken = idToken,
+            deviceId = deviceIdValue,
+            deviceName = android.os.Build.MODEL,
+            appVersion = "1.0",
+            systemVersion = android.os.Build.VERSION.RELEASE
+        )
+        return safeApiCall { apiService.linkGoogle(request) }.toResult().also { result ->
+            result.onSuccess { _currentUser.value = it }
         }
     }
 
@@ -99,174 +74,148 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun refreshUser() {
-        try {
-            val response = apiService.getProfile()
-            if (response.isSuccessful) {
-                _currentUser.value = response.body()
-            }
-        } catch (e: Exception) {}
+        safeApiCall { apiService.getProfile() }.onSuccess {
+            _currentUser.value = it
+        }
     }
 
     suspend fun updateProfile(name: String): Result<AppleUser> {
-        return try {
-            val response = apiService.updateProfile(UpdateProfileRequest(name))
-            if (response.isSuccessful) {
-                val user = response.body()!!
-                _currentUser.value = user
-                Result.success(user)
-            } else {
-                Result.failure(Exception("Update failed: ${response.code()}"))
-            }
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        return safeApiCall { apiService.updateProfile(UpdateProfileRequest(name)) }
+            .toResult()
+            .also { result -> result.onSuccess { _currentUser.value = it } }
     }
 
     suspend fun createPassword(password: String): Result<Unit> {
-        return try {
-            val response = apiService.createPassword(PasswordSetupRequest(password))
-            if (response.isSuccessful) Result.success(Unit) else Result.failure(Exception("Error ${response.code()}"))
-        } catch (e: Exception) { Result.failure(e) }
+        return safeApiCall { apiService.createPassword(PasswordSetupRequest(password)) }.toResult().map { Unit }
     }
 
     suspend fun changePassword(current: String, new: String): Result<Unit> {
-        return try {
-            val response = apiService.changePassword(PasswordChangeRequest(current, new))
-            if (response.isSuccessful) Result.success(Unit) else Result.failure(Exception("Error ${response.code()}"))
-        } catch (e: Exception) { Result.failure(e) }
+        return safeApiCall { apiService.changePassword(PasswordChangeRequest(current, new)) }.toResult().map { Unit }
     }
 
     suspend fun requestEmailChange(email: String): Result<Unit> {
-        return try {
-            val response = apiService.requestEmailChange(EmailChangeRequest(email))
-            if (response.isSuccessful) Result.success(Unit) else Result.failure(Exception("Error ${response.code()}"))
-        } catch (e: Exception) { Result.failure(e) }
+        return safeApiCall { apiService.requestEmailChange(EmailChangeRequest(email)) }.toResult().map { Unit }
     }
 
     suspend fun confirmEmailChange(code: String): Result<AppleUser> {
-        return try {
-            val response = apiService.confirmEmailChange(EmailConfirmRequest(code))
-            if (response.isSuccessful) {
-                val user = response.body()!!
-                _currentUser.value = user
-                Result.success(user)
-            } else Result.failure(Exception("Error ${response.code()}"))
-        } catch (e: Exception) { Result.failure(e) }
+        return safeApiCall { apiService.confirmEmailChange(EmailConfirmRequest(code)) }
+            .toResult()
+            .also { result -> result.onSuccess { _currentUser.value = it } }
     }
 
     suspend fun getSessions(): List<AccountSession> {
-        return try {
-            val response = apiService.getSessions()
-            if (response.isSuccessful) response.body() ?: emptyList() else emptyList()
-        } catch (e: Exception) { emptyList() }
+        return safeApiCall { apiService.getSessions() }.onSuccess { it }.getOrElse { emptyList() }
     }
 
     suspend fun revokeSession(sessionId: String): Result<Unit> {
-        return try {
-            val response = apiService.revokeSession(sessionId)
-            if (response.isSuccessful) Result.success(Unit) else Result.failure(Exception("Error ${response.code()}"))
-        } catch (e: Exception) { Result.failure(e) }
+        return safeApiCall { apiService.revokeSession(sessionId) }.toResult().map { Unit }
     }
 
     suspend fun logoutOthers(): Result<Unit> {
-        return try {
-            val response = apiService.logoutOthers()
-            if (response.isSuccessful) Result.success(Unit) else Result.failure(Exception("Error ${response.code()}"))
-        } catch (e: Exception) { Result.failure(e) }
+        return safeApiCall { apiService.logoutOthers() }.toResult().map { Unit }
     }
 
     suspend fun getMyRoleRequests(): List<RoleRequest> {
-        return try {
-            val response = apiService.getMyRoleRequests()
-            if (response.isSuccessful) response.body() ?: emptyList() else emptyList()
-        } catch (e: Exception) { emptyList() }
+        return safeApiCall { apiService.getMyRoleRequests() }.onSuccess { it }.getOrElse { emptyList() }
     }
 
     suspend fun createRoleRequest(type: String, groupId: Int?, groupName: String?, comment: String?): Result<RoleRequest> {
-        return try {
-            val response = apiService.createRoleRequest(RoleRequestCreateRequest(type, groupId, groupName, comment))
-            if (response.isSuccessful) response.body()?.let { Result.success(it) } ?: Result.failure(Exception("Empty body"))
-            else Result.failure(Exception("Error ${response.code()}"))
-        } catch (e: Exception) { Result.failure(e) }
+        return safeApiCall { apiService.createRoleRequest(RoleRequestCreateRequest(type, groupId, groupName, comment)) }.toResult()
     }
 
     suspend fun requestEmailVerification(email: String): Result<Unit> {
-        return try {
-            val response = apiService.requestContactEmail(ContactEmailRequest(email))
-            if (response.isSuccessful) Result.success(Unit) else Result.failure(Exception("Error ${response.code()}"))
-        } catch (e: Exception) { Result.failure(e) }
+        return safeApiCall { apiService.requestContactEmail(ContactEmailRequest(email)) }.toResult().map { Unit }
     }
 
     suspend fun resendEmailVerification(): Result<Unit> {
-        return try {
-            val response = apiService.resendContactEmailVerification()
-            if (response.isSuccessful) Result.success(Unit) else Result.failure(Exception("Error ${response.code()}"))
-        } catch (e: Exception) { Result.failure(e) }
+        return safeApiCall { apiService.resendContactEmailVerification() }.toResult().map { Unit }
     }
 
     suspend fun getGroupUsers(groupId: Int): List<GroupUserDto> {
-        return try {
-            val response = apiService.getGroupUsers(groupId)
-            if (response.isSuccessful) {
-                response.body() ?: emptyList()
-            } else {
-                emptyList()
-            }
-        } catch (e: Exception) {
-            emptyList()
-        }
+        return safeApiCall { apiService.getGroupUsers(groupId) }.onSuccess { it }.getOrElse { emptyList() }
     }
 
     suspend fun getAdminUsers(): List<AdminUserDto> {
-        return try {
-            val response = apiService.getAdminUsers()
-            if (response.isSuccessful) response.body() ?: emptyList() else emptyList()
-        } catch (e: Exception) { emptyList() }
+        return safeApiCall { apiService.getAdminUsers() }.onSuccess { it }.getOrElse { emptyList() }
     }
 
     suspend fun getAdminRoleRequests(status: String): List<AdminRoleRequestDto> {
-        return try {
-            val response = apiService.getAdminRoleRequests(status)
-            if (response.isSuccessful) response.body() ?: emptyList() else emptyList()
-        } catch (e: Exception) { emptyList() }
+        return safeApiCall { apiService.getAdminRoleRequests(status) }.onSuccess { it }.getOrElse { emptyList() }
     }
 
     suspend fun approveRoleRequest(requestId: Int): Result<Unit> {
-        return try {
-            val response = apiService.approveRoleRequest(requestId)
-            if (response.isSuccessful) Result.success(Unit) else Result.failure(Exception("Error ${response.code()}"))
-        } catch (e: Exception) { Result.failure(e) }
+        return safeApiCall { apiService.approveRoleRequest(requestId) }.toResult().map { Unit }
     }
 
     suspend fun rejectRoleRequest(requestId: Int): Result<Unit> {
-        return try {
-            val response = apiService.rejectRoleRequest(requestId)
-            if (response.isSuccessful) Result.success(Unit) else Result.failure(Exception("Error ${response.code()}"))
-        } catch (e: Exception) { Result.failure(e) }
+        return safeApiCall { apiService.rejectRoleRequest(requestId) }.toResult().map { Unit }
     }
 
-    suspend fun grantRole(userId: Int, role: String): Result<Unit> {
-        return try {
-            val response = apiService.grantRole(ru.moonbaystudio.myherzen.data.remote.GrantRoleRequest(userId, role))
-            if (response.isSuccessful) Result.success(Unit) else Result.failure(Exception("Error ${response.code()}"))
-        } catch (e: Exception) { Result.failure(e) }
+    suspend fun grantRole(userId: String, role: String): Result<Unit> {
+        return safeApiCall { apiService.grantRole(GrantRoleRequest(userId, role)) }.toResult().map { Unit }
     }
 
-    suspend fun clearCache() {
-        // Implement clearing logic
+    suspend fun revokeRole(userId: String, role: String): Result<Unit> {
+        return safeApiCall { apiService.revokeRole(GrantRoleRequest(userId, role)) }.toResult().map { Unit }
+    }
+
+    suspend fun getAdminBadges(): List<BadgeDto> {
+        return safeApiCall { apiService.getAdminBadges() }.getOrElse { emptyList() }
+    }
+
+    suspend fun grantBadge(userId: String, badgeCode: String, note: String?): Result<AdminUserDto> {
+        return safeApiCall { apiService.grantBadge(userId, BadgeMutationRequest(badgeCode, note)) }.toResult()
+    }
+
+    suspend fun revokeBadge(userId: String, badgeCode: String): Result<AdminUserDto> {
+        return safeApiCall { apiService.revokeBadge(userId, badgeCode) }.toResult()
+    }
+
+    suspend fun getAdminSettings(): List<AdminRuntimeSetting> {
+        return safeApiCall { apiService.getAdminSettings() }.getOrElse { emptyList() }
+    }
+
+    suspend fun updateAdminSetting(key: String, value: Any): Result<AdminRuntimeSetting> {
+        return safeApiCall { apiService.updateAdminSetting(key, RuntimeSettingPatchRequest(value)) }.toResult()
+    }
+
+    suspend fun getAdminSystemNotices(): List<SystemNotice> {
+        return safeApiCall { apiService.getAdminSystemNotices() }.getOrElse { emptyList() }
+    }
+
+    suspend fun createAdminSystemNotice(request: SystemNoticeMutationRequest): Result<SystemNotice> {
+        return safeApiCall { apiService.createAdminSystemNotice(request) }.toResult()
+    }
+
+    suspend fun updateAdminSystemNotice(id: Int, request: SystemNoticeMutationRequest): Result<SystemNotice> {
+        return safeApiCall { apiService.updateAdminSystemNotice(id, request) }.toResult()
+    }
+
+    suspend fun deleteAdminSystemNotice(id: Int): Result<Unit> {
+        return safeApiCall { apiService.deleteAdminSystemNotice(id) }.toResult().map { Unit }
+    }
+
+    suspend fun activateSystemNotice(id: Int): Result<Unit> {
+        return safeApiCall { apiService.activateSystemNotice(id) }.toResult().map { Unit }
+    }
+
+    suspend fun deactivateSystemNotice(id: Int): Result<Unit> {
+        return safeApiCall { apiService.deactivateSystemNotice(id) }.toResult().map { Unit }
+    }
+
+    suspend fun getAdminUserSessions(userId: String): List<AccountSession> {
+        return safeApiCall { apiService.getAdminUserSessions(userId) }.onSuccess { it }.getOrElse { emptyList() }
+    }
+
+    suspend fun revokeAdminSession(sessionId: String): Result<Unit> {
+        return safeApiCall { apiService.revokeAdminSession(sessionId) }.toResult().map { Unit }
     }
 
     suspend fun requestPasswordReset(email: String): Result<Unit> {
-        return try {
-            val response = apiService.requestPasswordReset(ResetPasswordRequest(email))
-            if (response.isSuccessful) Result.success(Unit) else Result.failure(Exception("Error ${response.code()}"))
-        } catch (e: Exception) { Result.failure(e) }
+        return safeApiCall { apiService.requestPasswordReset(ResetPasswordRequest(email)) }.toResult().map { Unit }
     }
 
     suspend fun confirmPasswordReset(code: String, newPassword: String): Result<Unit> {
-        return try {
-            val response = apiService.confirmPasswordReset(ResetPasswordConfirmRequest(code, newPassword))
-            if (response.isSuccessful) Result.success(Unit) else Result.failure(Exception("Error ${response.code()}"))
-        } catch (e: Exception) { Result.failure(e) }
+        return safeApiCall { apiService.confirmPasswordReset(ResetPasswordConfirmRequest(code, newPassword)) }.toResult().map { Unit }
     }
 }

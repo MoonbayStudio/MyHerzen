@@ -27,13 +27,20 @@ object NetworkModule {
     @Singleton
     fun provideAuthInterceptor(userPreferences: UserPreferences): Interceptor {
         return Interceptor { chain ->
-            val token = runBlocking { userPreferences.authToken.first() }
-            val request = chain.request().newBuilder().apply {
-                if (token != null) {
-                    addHeader("Authorization", "Bearer $token")
-                }
-            }.build()
-            chain.proceed(request)
+            val request = chain.request()
+            val host = request.url.host
+
+            val newRequest = if (host.contains("moonbaystudio.ru")) {
+                val token = runBlocking { userPreferences.authToken.first() }
+                request.newBuilder().apply {
+                    if (token != null) {
+                        addHeader("Authorization", "Bearer $token")
+                    }
+                }.build()
+            } else {
+                request
+            }
+            chain.proceed(newRequest)
         }
     }
 

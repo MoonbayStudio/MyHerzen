@@ -129,6 +129,7 @@ struct SystemNoticeDraft: Equatable {
 struct AdminSystemNoticesView: View {
     let activeTheme: AppTheme
     let onBack: () -> Void
+    var toolbarRefreshRequest: Binding<Int>? = nil
 
     @StateObject private var viewModel = AdminSystemNoticesViewModel()
     @State private var draft = SystemNoticeDraft()
@@ -162,15 +163,19 @@ struct AdminSystemNoticesView: View {
                 }
             )
         }
+        .onChange(of: toolbarRefreshRequest?.wrappedValue ?? 0) { _ in
+            guard toolbarRefreshRequest != nil else { return }
+            Task { await viewModel.load() }
+        }
     }
 
+    @ViewBuilder
     private var header: some View {
-        HStack(spacing: 10) {
 #if os(iOS)
+        HStack(spacing: 10) {
             MyHerzenTitleBackHeader(shape: activeTheme.headerShape, title: "Уведомления") {
                 onBack()
             }
-#endif
             Spacer(minLength: 0)
             Button {
                 Task { await viewModel.load() }
@@ -182,6 +187,9 @@ struct AdminSystemNoticesView: View {
             .myherzenDefaultSurface(cornerRadius: 18, padding: 0)
             .disabled(viewModel.isLoading)
         }
+#else
+        EmptyView()
+#endif
     }
 
     @ViewBuilder

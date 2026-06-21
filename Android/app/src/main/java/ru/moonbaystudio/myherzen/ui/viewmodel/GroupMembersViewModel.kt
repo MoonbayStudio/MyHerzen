@@ -7,7 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import ru.moonbaystudio.myherzen.data.remote.GroupUserDto
+import ru.moonbaystudio.myherzen.data.remote.dto.GroupUserDto
 import ru.moonbaystudio.myherzen.data.repository.AuthRepository
 import javax.inject.Inject
 

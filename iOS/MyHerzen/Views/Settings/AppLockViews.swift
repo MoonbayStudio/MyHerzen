@@ -85,6 +85,7 @@ struct AppLockGateView: View {
     @State private var passcode = ""
     @State private var errorMessage: String?
     @State private var isAuthenticating = false
+    @State private var didFinishBiometryAttempt = false
 
     var body: some View {
         ZStack {
@@ -99,44 +100,56 @@ struct AppLockGateView: View {
                 VStack(spacing: 6) {
                     Text("MyHerzen заблокирован")
                         .font(.title3.weight(.semibold))
-                    Text("Введите код приложения")
+                    Text(subtitleText)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
                 }
 
-                SecureField("Код", text: $passcode)
-                    .keyboardType(.numberPad)
-                    .textContentType(.oneTimeCode)
-                    .multilineTextAlignment(.center)
-                    .font(.title3.weight(.semibold))
-                    .padding(12)
-                    .background(Color.myherzenHeaderCapsuleFill)
-                    .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                    .onSubmit { unlockWithPasscode() }
+                if shouldShowPasscodeFallback {
+                    SecureField("Код", text: $passcode)
+                        .keyboardType(.numberPad)
+                        .textContentType(.oneTimeCode)
+                        .multilineTextAlignment(.center)
+                        .font(.title3.weight(.semibold))
+                        .padding(12)
+                        .background(Color.myherzenHeaderCapsuleFill)
+                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        .onSubmit { unlockWithPasscode() }
+                } else {
+                    ProgressView()
+                        .controlSize(.large)
+                        .transition(.opacity)
+                }
 
                 if let errorMessage {
                     Text(errorMessage)
                         .font(.caption)
                         .foregroundColor(.red)
+                        .multilineTextAlignment(.center)
                 }
 
-                Button {
-                    unlockWithPasscode()
-                } label: {
-                    Text("Разблокировать")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.accentColor.opacity(0.16))
-                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                if shouldShowPasscodeFallback {
+                    Button {
+                        unlockWithPasscode()
+                    } label: {
+                        Text("Разблокировать")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.accentColor.opacity(0.16))
+                            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
-                .buttonStyle(.plain)
 
-                if lockManager.isBiometryEnabled && lockManager.canUseBiometry {
+                if shouldShowPasscodeFallback && canAttemptBiometry {
                     Button {
                         authenticateWithBiometry()
                     } label: {
-                        Label(lockManager.biometryTitle, systemImage: lockManager.biometryTitle == "Face ID" ? "faceid" : "touchid")
+                        Label("Повторить \(lockManager.biometryTitle)", systemImage: lockManager.biometryTitle == "Face ID" ? "faceid" : "touchid")
                             .font(.subheadline.weight(.semibold))
                     }
                     .buttonStyle(.plain)
@@ -148,11 +161,35 @@ struct AppLockGateView: View {
             .myherzenDefaultSurface(cornerRadius: 22, padding: 18)
             .padding(24)
         }
+        .animation(.easeInOut(duration: 0.2), value: shouldShowPasscodeFallback)
         .onAppear {
-            if lockManager.isBiometryEnabled {
+            if canAttemptBiometry {
+                didFinishBiometryAttempt = false
                 authenticateWithBiometry()
+            } else {
+                didFinishBiometryAttempt = true
             }
         }
+    }
+
+    private var canAttemptBiometry: Bool {
+        lockManager.isBiometryEnabled && lockManager.canUseBiometry
+    }
+
+    private var shouldShowPasscodeFallback: Bool {
+        !canAttemptBiometry || didFinishBiometryAttempt
+    }
+
+    private var subtitleText: String {
+        if !shouldShowPasscodeFallback {
+            return "Используйте \(lockManager.biometryTitle), чтобы разблокировать приложение"
+        }
+
+        if canAttemptBiometry {
+            return "Не удалось распознать. Введите код приложения"
+        }
+
+        return "Введите код приложения"
     }
 
     private func unlockWithPasscode() {
@@ -168,10 +205,12 @@ struct AppLockGateView: View {
     private func authenticateWithBiometry() {
         guard !isAuthenticating else { return }
         isAuthenticating = true
+        errorMessage = nil
         Task {
             let success = await lockManager.authenticateWithBiometry()
             if !success {
                 errorMessage = nil
+                didFinishBiometryAttempt = true
             }
             isAuthenticating = false
         }

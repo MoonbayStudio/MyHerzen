@@ -12,7 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import ru.moonbaystudio.myherzen.data.remote.BadgeDto
+import ru.moonbaystudio.myherzen.data.remote.dto.BadgeDto
 
 @Composable
 fun BadgeIcon(

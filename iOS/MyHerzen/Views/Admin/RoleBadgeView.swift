@@ -137,6 +137,7 @@ struct UserBadgeIconView: View {
     var body: some View {
         Image(badge.iconName)
             .resizable()
+            .interpolation(.high)
             .scaledToFit()
             .frame(width: size, height: size)
             .accessibilityHidden(true)
@@ -161,9 +162,7 @@ struct UserBadgeInlineStackView: View {
                     Button {
                         selectedBadge = badge
                     } label: {
-                        UserBadgeIconView(badge: badge, size: iconSize)
-                            .frame(width: iconSize + 4, height: iconSize + 4)
-                            .contentShape(Rectangle())
+                        badgeIconButtonLabel(for: badge)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("\(badge.title), \(badge.rarity.localizedTitle)")
@@ -171,10 +170,14 @@ struct UserBadgeInlineStackView: View {
                 }
             }
             .fixedSize(horizontal: true, vertical: false)
-            .sheet(item: $selectedBadge) { badge in
-                UserBadgeDetailView(badge: badge)
-            }
+            .userBadgeDetailPresentation(selectedBadge: $selectedBadge)
         }
+    }
+
+    private func badgeIconButtonLabel(for badge: UserBadge) -> some View {
+        UserBadgeIconView(badge: badge, size: iconSize)
+            .frame(width: iconSize + 4, height: iconSize + 4)
+            .contentShape(Rectangle())
     }
 }
 
@@ -217,9 +220,7 @@ struct UserBadgeGalleryView: View {
                     }
                 }
             }
-            .sheet(item: $selectedBadge) { badge in
-                UserBadgeDetailView(badge: badge)
-            }
+            .userBadgeDetailPresentation(selectedBadge: $selectedBadge)
         }
     }
 
@@ -257,9 +258,25 @@ struct UserBadgeGalleryView: View {
 
 private struct UserBadgeDetailView: View {
     let badge: UserBadge
+    var onClose: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 14) {
+            #if os(macOS)
+            HStack {
+                Spacer(minLength: 0)
+                Button {
+                    onClose?()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Закрыть")
+            }
+            #endif
+
             UserBadgeIconView(badge: badge, size: 64)
                 .padding(.top, 10)
 
@@ -281,8 +298,13 @@ private struct UserBadgeDetailView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+#if os(macOS)
+        .padding(18)
+        .frame(width: 300)
+#else
         .padding(22)
         .frame(maxWidth: 360)
+#endif
         .presentationDetentsIfAvailable()
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(badge.title). \(badge.rarity.localizedTitle). \(badge.description)")
@@ -305,6 +327,33 @@ private extension BadgeRarity {
 }
 
 private extension View {
+    @ViewBuilder
+    func userBadgeDetailPresentation(selectedBadge: Binding<UserBadge?>) -> some View {
+#if os(macOS)
+        self.popover(
+            isPresented: Binding(
+                get: { selectedBadge.wrappedValue != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        selectedBadge.wrappedValue = nil
+                    }
+                }
+            ),
+            arrowEdge: .bottom
+        ) {
+            if let badge = selectedBadge.wrappedValue {
+                UserBadgeDetailView(badge: badge) {
+                    selectedBadge.wrappedValue = nil
+                }
+            }
+        }
+#else
+        self.sheet(item: selectedBadge) { badge in
+            UserBadgeDetailView(badge: badge)
+        }
+#endif
+    }
+
     @ViewBuilder
     func presentationDetentsIfAvailable() -> some View {
 #if os(iOS)

@@ -11,6 +11,8 @@ class SettingsRepository @Inject constructor(
     val selectedGroupId = userPreferences.selectedGroupId
     val selectedGroupName = userPreferences.selectedGroupName
     val scheduleCacheWeeks = userPreferences.scheduleCacheWeeks
+    val offlineScheduleEnabled = userPreferences.liveActivityEnabled // Assuming this maps to it
+    val offlineScheduleWeeks = userPreferences.scheduleCacheWeeks
     val liveActivityEnabled = userPreferences.liveActivityEnabled
 
     suspend fun saveSelectedGroup(id: Int, name: String) {

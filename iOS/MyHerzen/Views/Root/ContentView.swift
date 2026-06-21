@@ -8,7 +8,7 @@
 import SwiftUI
 internal import Combine
 import AVFoundation
-#if os(macos)
+#if os(macOS)
 import Cocoa
 #endif
 
@@ -60,9 +60,15 @@ struct ContentView: View {
 #if os(iOS)
     @State private var isScheduleTopChromeVisible = true
     @State private var isBottomIslandHiddenByScheduleScroll = false
+    @State private var isScheduleCalendarPresented = false
+    @State private var scheduleCalendarDisplayedMonth = Date()
+    @State private var bottomIslandRefreshPromptIndex: Int?
+    @State private var scheduleRefreshRequestID = 0
+    @State private var sessionRefreshRequestID = 0
 #endif
 
     private let contentHorizontalPadding: CGFloat = 16
+    private let scheduleCalendarVerticalOffset: CGFloat = 11
 
     private struct MenuBackSwipeConfig {
         let edgeWidth: CGFloat
@@ -85,7 +91,6 @@ struct ContentView: View {
     }
 
     private let menuBackSwipeConfig = MenuBackSwipeConfig.default
-    @State private var showOfflineCacheInfo = false
     @State private var isKeyboardVisible = false
     private let speechSynthesizer = AVSpeechSynthesizer()
 
@@ -215,7 +220,8 @@ struct ContentView: View {
                         ScheduleView(viewModel: viewModel, selectedDate: $selectedDate,
                                      groupId: selectedGroup?.id ?? viewModel.savedGroupId,
                                      examOnly: selectedIndex == 2,
-                                     onScrollChromeChange: handleScheduleScrollChrome)
+                                     onScrollChromeChange: handleScheduleScrollChrome,
+                                     externalRefreshRequest: selectedIndex == 2 ? sessionRefreshRequestID : scheduleRefreshRequestID)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                         scheduleTopOverlay
@@ -228,7 +234,8 @@ struct ContentView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .transition(.opacity)
                 } else if selectedIndex == 3 {
-                    AccountView(nestedScreenPresented: $isAccountNestedScreenPresented)
+                    AccountView(scheduleViewModel: viewModel,
+                                nestedScreenPresented: $isAccountNestedScreenPresented)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .transition(.opacity)
                 } else if selectedIndex == 4 {
@@ -262,7 +269,11 @@ struct ContentView: View {
             .animation(.easeOut(duration: 0.14), value: selectedIndex)
 
             if showBottomIslandAnimated {
-                BottomIsland(selectedIndex: $selectedIndex)
+                BottomIsland(
+                    selectedIndex: $selectedIndex,
+                    refreshPromptIndex: $bottomIslandRefreshPromptIndex,
+                    onRefreshSelectedTab: handleBottomIslandRefresh
+                )
                     .frame(height: 80)
                     .offset(y: isBottomIslandHiddenByScheduleScroll ? 110 : 0)
                     .opacity(isBottomIslandHiddenByScheduleScroll ? 0 : 1)
@@ -296,13 +307,6 @@ struct ContentView: View {
                     .padding(.horizontal, 12)
                 }
 
-                if notificationsEnabled, let lesson = viewModel.activeLesson, selectedIndex != 4 {
-                    ActiveLessonNotificationView(
-                        lesson: lesson,
-                        progress: viewModel.activeLessonProgress
-                    )
-                    .padding(.horizontal, 12)
-                }
             }
             .padding(.top, 8)
         }
@@ -328,11 +332,6 @@ struct ContentView: View {
             }
         }
         .onChange(of: viewModel.animatedItems) { _ in }
-        .alert("Офлайн-режим", isPresented: $showOfflineCacheInfo) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text("Включен офлайн-режим. Расписание загружается из кэша.")
-        }
         .onChange(of: selectedGroup) { newGroup in
             let groupIdToLoad = newGroup?.id ?? ""
             guard !groupIdToLoad.isEmpty else { return }
@@ -440,6 +439,7 @@ struct ContentView: View {
         }
         .onChange(of: selectedIndex) { newIndex in
             resetScheduleScrollChrome()
+            bottomIslandRefreshPromptIndex = nil
             if newIndex != 3 {
                 isAccountNestedScreenPresented = false
             }
@@ -465,35 +465,33 @@ struct ContentView: View {
 
 #if os(iOS)
     private var scheduleTopOverlay: some View {
-        HStack(alignment: .center) {
-            ThemedChrome(shape: activeTheme.headerShape) {
-                Text(selectedIndex == 2 ? "Сессия" : "Расписание")
-                    .font(.title3.weight(.semibold))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .frame(height: 44)
-                    .background(Color.clear)
-            }
-            Spacer()
+        GeometryReader { geometry in
+            ZStack(alignment: .topTrailing) {
+                HStack(alignment: .center) {
+                    ThemedChrome(shape: activeTheme.headerShape) {
+                        Text(selectedIndex == 2 ? "Сессия" : "Расписание")
+                            .font(.title3.weight(.semibold))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .frame(height: 44)
+                            .background(Color.clear)
+                    }
+                    Spacer()
 
-            if selectedIndex == 0 {
-                ThemedChrome(shape: activeTheme.dateShape) {
-                    HStack(spacing: viewModel.isUsingOfflineCache ? 8 : 0) {
-                        if viewModel.isUsingOfflineCache {
-                            Button {
-                                showOfflineCacheInfo = true
-                            } label: {
-                                Image(systemName: offlineCacheIconName)
-                                    .font(.body.weight(.semibold))
-                                    .foregroundColor(.primary)
-                                    .frame(width: 16, height: 16)
+                    if selectedIndex == 0 {
+                        ThemedChrome(shape: activeTheme.dateShape) {
+                            CalendarDatePicker(
+                                selectedDate: $selectedDate,
+                                showsChrome: false,
+                                showsCalendarIcon: true,
+                                pickerPresentationOffset: CGSize(width: 0, height: scheduleCalendarVerticalOffset),
+                                alignsPickerPresentationToTrailingEdge: true
+                            ) {
+                                scheduleCalendarDisplayedMonth = selectedDate
+                                withAnimation(.spring(response: 0.24, dampingFraction: 0.88)) {
+                                    isScheduleCalendarPresented.toggle()
+                                }
                             }
-                            .frame(width: 24, height: 36)
-                            .buttonStyle(.plain)
-                            .transition(.move(edge: .trailing).combined(with: .scale(scale: 0.82)).combined(with: .opacity))
-                        }
-
-                        CalendarDatePicker(selectedDate: $selectedDate, showsChrome: false)
                             .onChange(of: selectedDate) { _ in
                                 let groupIdToLoad = selectedGroup?.id ?? viewModel.savedGroupId
                                 guard !groupIdToLoad.isEmpty else { return }
@@ -501,18 +499,49 @@ struct ContentView: View {
                                     await viewModel.loadOnce(groupId: groupIdToLoad, date: selectedDate, examOnly: false)
                                 }
                             }
-                            .frame(width: viewModel.isUsingOfflineCache ? 136 : 150, height: 44, alignment: .center)
+                            .padding(.horizontal, 12)
+                            .frame(width: 192, height: 44, alignment: .center)
+                        }
                     }
-                    .padding(.horizontal, 12)
-                    .frame(height: 44, alignment: .center)
-                    .animation(.easeInOut(duration: 0.22), value: viewModel.isUsingOfflineCache)
+                }
+                .padding(.horizontal, contentHorizontalPadding)
+                .padding(.top, 16)
+                .padding(.bottom, 16)
+
+                if selectedIndex == 0 && isScheduleCalendarPresented {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.easeOut(duration: 0.16)) {
+                                isScheduleCalendarPresented = false
+                            }
+                        }
+                        .zIndex(5)
+                }
+
+                if selectedIndex == 0 && isScheduleCalendarPresented {
+                    AlignedCalendarOverlay(
+                        selectedDate: $selectedDate,
+                        displayedMonth: $scheduleCalendarDisplayedMonth
+                    ) {
+                        withAnimation(.easeOut(duration: 0.16)) {
+                            isScheduleCalendarPresented = false
+                        }
+                    }
+                    .frame(width: min(geometry.size.width - contentHorizontalPadding * 2, 320))
+                    .padding(.top, 16 + 44 + scheduleCalendarVerticalOffset)
+                    .padding(.trailing, contentHorizontalPadding)
+                    .transition(.scale(scale: 0.96, anchor: .topTrailing).combined(with: .opacity))
+                    .zIndex(10)
                 }
             }
         }
-        .padding(.horizontal, contentHorizontalPadding)
-        .padding(.top, 16)
-        .padding(.bottom, 16)
         .frame(maxWidth: .infinity, alignment: .top)
+        .frame(
+            maxWidth: .infinity,
+            maxHeight: isScheduleCalendarPresented ? .infinity : 76,
+            alignment: .top
+        )
         .offset(y: isScheduleTopChromeVisible ? 0 : -72)
         .opacity(isScheduleTopChromeVisible ? 1 : 0)
         .allowsHitTesting(isScheduleTopChromeVisible)
@@ -545,6 +574,18 @@ struct ContentView: View {
     private func resetScheduleScrollChrome() {
         isScheduleTopChromeVisible = true
         isBottomIslandHiddenByScheduleScroll = false
+    }
+
+    private func handleBottomIslandRefresh(_ index: Int) {
+        guard selectedIndex == index else { return }
+        switch index {
+        case 0:
+            scheduleRefreshRequestID += 1
+        case 2:
+            sessionRefreshRequestID += 1
+        default:
+            break
+        }
     }
 #endif
 
@@ -787,24 +828,6 @@ struct ContentView: View {
         }
     }
 
-    private var offlineCacheIconName: String {
-#if os(iOS)
-        if #available(iOS 14.0, *) {
-            return "wifi.slash"
-        } else {
-            return "wifi"
-        }
-#elseif os(macOS)
-        if #available(macOS 11.0, *) {
-            return "wifi.slash"
-        } else {
-            return "wifi"
-        }
-#else
-        return "wifi"
-#endif
-    }
-
     @ViewBuilder
     private var contentCapsuleBackground: some View {
 #if os(iOS)
@@ -851,14 +874,21 @@ struct ContentView: View {
     struct SplitViewContent: View {
         let parent: ContentView
 
+        private let sidebarItems: [(title: String, icon: String, tag: Int)] = [
+            ("Расписание", "calendar", 0),
+            ("Пеликаша", "bubble.left.and.bubble.right.fill", 1),
+            ("Сессия", "graduationcap.fill", 2),
+            ("Аккаунт", "person.crop.circle.fill", 3),
+            ("Меню", "line.3.horizontal", 4)
+        ]
+
         var body: some View {
             NavigationSplitView {
                 List(selection: parent.$selectedView) {
-                    Text("Расписание").tag(0)
-                    Text("Пеликаша").tag(1)
-                    Text("Сессия").tag(2)
-                    Text("Аккаунт").tag(3)
-                    Text("Меню").tag(4)
+                    ForEach(sidebarItems, id: \.tag) { item in
+                        Label(item.title, systemImage: item.icon)
+                            .tag(item.tag)
+                    }
                 }
             } detail: {
                 MainContentView(
@@ -888,6 +918,8 @@ struct ContentView: View {
         @State private var accountToolbarTitle = "Аккаунт"
         @State private var accountToolbarShowsBackButton = false
         @State private var accountToolbarBackRequest = 0
+        @State private var accountToolbarShowsRefreshButton = false
+        @State private var accountToolbarRefreshRequest = 0
         @AppStorage("selectedThemeID") private var selectedThemeID = AppThemeCatalog.default
 
         private var activeTheme: AppTheme {
@@ -960,6 +992,9 @@ struct ContentView: View {
                 .padding(.leading, 16)
                 .background(Color.clear)
                 .fixedSize(horizontal: true, vertical: false)
+                .animation(.easeInOut(duration: 0.18), value: accountToolbarTitle)
+                .animation(.easeInOut(duration: 0.18), value: accountToolbarShowsBackButton)
+                .animation(.easeInOut(duration: 0.18), value: selectedMenuSubView)
             }
         }
 
@@ -1004,9 +1039,13 @@ struct ContentView: View {
                         .frame(width: 16, height: 44)
                         .buttonStyle(.plain)
 
-                        CalendarDatePicker(selectedDate: $selectedDate, showsChrome: false)
+                        CalendarDatePicker(
+                            selectedDate: $selectedDate,
+                            showsChrome: false,
+                            showsCalendarIcon: true
+                        )
                             .font(.system(size: 13, weight: .medium))
-                            .frame(width: 144, height: 36, alignment: .center)
+                            .frame(width: 164, height: 36, alignment: .center)
                     }
                     .fixedSize(horizontal: true, vertical: false)
                     .frame(height: 36, alignment: .center)
@@ -1015,6 +1054,11 @@ struct ContentView: View {
                     .padding(.vertical, 0)
                     .background(Color.clear)
                 }
+            } else if selectedIndex == 3 && accountToolbarShowsRefreshButton {
+                MyHerzenToolbarIconButton(shape: activeTheme.headerShape, systemImage: "arrow.clockwise") {
+                    accountToolbarRefreshRequest += 1
+                }
+                .accessibilityLabel("Обновить")
             } else {
                 EmptyView()
             }
@@ -1052,10 +1096,13 @@ struct ContentView: View {
                              examOnly: true)
                 .background(unifiedContentBackground)
             case 3:
-                AccountView(showPremiumScreen: $isAccountPremiumPresented,
+                AccountView(scheduleViewModel: scheduleViewModel,
+                            showPremiumScreen: $isAccountPremiumPresented,
                             toolbarTitle: $accountToolbarTitle,
                             toolbarShowsBackButton: $accountToolbarShowsBackButton,
-                            toolbarBackRequest: $accountToolbarBackRequest)
+                            toolbarBackRequest: $accountToolbarBackRequest,
+                            toolbarShowsRefreshButton: $accountToolbarShowsRefreshButton,
+                            toolbarRefreshRequest: $accountToolbarRefreshRequest)
                     .background(unifiedContentBackground)
             case 4:
                 if #available(macOS 26.0, *) {

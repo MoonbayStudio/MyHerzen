@@ -51,23 +51,34 @@ fun AboutScreen(onBack: () -> Unit) {
         ) {
             Surface(
                 modifier = Modifier.size(120.dp),
-                shape = RoundedCornerShape(24.dp),
-                color = MaterialTheme.colorScheme.primaryContainer
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text("MH", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // Используем фоновый цвет иконки
+                    androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawRoundRect(
+                            color = androidx.compose.ui.graphics.Color.White,
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(28.dp.toPx())
+                        )
+                    }
+                    Image(
+                        painter = painterResource(id = R.mipmap.ic_launcher_foreground),
+                        contentDescription = "App Icon",
+                        modifier = Modifier.fillMaxSize()
+                    )
                 }
             }
             
             Spacer(Modifier.height(24.dp))
             
-            Text(text = "MyHerzen", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text(text = "v1.0.0 (Android)", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(text = "Твой Герцена", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text(text = "v 0.1 alpha (Android)", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             
             Spacer(Modifier.height(32.dp))
             
             Text(
-                text = "Лучшее неофициальное приложение для студентов РГПУ им. А. И. Герцена. Сделано с любовью командой Moonbay Studio.",
+                text = "Сделано с любовью командой Moonbay Studio для Пов-1/25. Ну и остальных челов. Вдохновитель - Стефания Здор",
                 style = MaterialTheme.typography.bodyLarge,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurface

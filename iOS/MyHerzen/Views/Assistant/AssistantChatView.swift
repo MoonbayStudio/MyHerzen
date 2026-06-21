@@ -2,16 +2,17 @@ import SwiftUI
 
 struct AssistantChatView: View {
     @AppStorage("selectedThemeID") private var selectedThemeID = AppThemeCatalog.default
-    @StateObject private var viewModel: AssistantChatViewModel
+    @StateObject private var viewModel: PelikashaChatViewModel
     @EnvironmentObject private var runtimeConfig: RuntimeConfigService
     @State private var isKeyboardVisible = false
     @State private var showPersonaSelection = false
+    @State private var showHistory = false
 
     let onBack: (() -> Void)?
 
     init(selectedDate: Date? = nil, onBack: (() -> Void)? = nil) {
         self._viewModel = StateObject(
-            wrappedValue: AssistantChatViewModel(selectedDateProvider: { selectedDate })
+            wrappedValue: PelikashaChatViewModel(selectedDateProvider: { selectedDate })
         )
         self.onBack = onBack
     }
@@ -33,16 +34,32 @@ struct AssistantChatView: View {
                     }
                 )
                 .transition(.move(edge: .trailing).combined(with: .opacity))
+            } else if showHistory {
+                PelikashaHistoryView(
+                    history: viewModel.history,
+                    currentDialogID: viewModel.currentDialogID,
+                    openDialog: { id in viewModel.openDialog(id: id) },
+                    newDialog: { viewModel.startNewDialog() },
+                    deleteDialog: { id in viewModel.deleteDialog(id: id) },
+                    clearHistory: { viewModel.clearHistory() },
+                    closeHistory: {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            showHistory = false
+                        }
+                    }
+                )
+                .transition(.move(edge: .trailing).combined(with: .opacity))
             } else {
                 chatContent
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
         }
         .animation(.easeInOut(duration: 0.18), value: showPersonaSelection)
+        .animation(.easeInOut(duration: 0.18), value: showHistory)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(ThemedBackground(theme: activeTheme).ignoresSafeArea())
         .onDisappear {
-            viewModel.cancel()
+            viewModel.cancelCurrentRequest()
         }
 #if os(macOS)
         .modifier(AssistantMacToolbarModifier(
@@ -147,22 +164,26 @@ struct AssistantChatView: View {
                         .myherzenDefaultSurface()
                 }
 
-                Button {
+                headerIconButton(systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90",
+                                 accessibilityLabel: "История чата") {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        showHistory = true
+                    }
+                }
+
+                headerIconButton(systemImage: "gearshape.fill",
+                                 accessibilityLabel: "Настройки Пеликаши") {
                     withAnimation(.easeInOut(duration: 0.18)) {
                         showPersonaSelection = true
                     }
-                } label: {
-                    ThemedChrome(shape: activeTheme.headerShape) {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.primary)
-                            .frame(width: 36, height: 36)
-                            .background(Color.clear)
-                            .contentShape(Circle())
+                }
+
+                headerIconButton(systemImage: "plus",
+                                 accessibilityLabel: "Новый чат") {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        viewModel.startNewDialog()
                     }
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Выбрать персонажа")
             }
 
             Text(runtimeConfig.settings.aiEnabled ? "Пеликаша может ошибаться. Расписание лучше сверять с основным экраном." : "AI-чат временно отключён администратором.")
@@ -209,10 +230,20 @@ struct AssistantChatView: View {
                 }
             }
 
+            MyHerzenToolbarIconButton(shape: activeTheme.headerShape, systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90") {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    showHistory = true
+                }
+            }
+
             MyHerzenToolbarIconButton(shape: activeTheme.headerShape, systemImage: "gearshape.fill") {
                 withAnimation(.easeInOut(duration: 0.18)) {
                     showPersonaSelection = true
                 }
+            }
+
+            MyHerzenToolbarIconButton(shape: activeTheme.headerShape, systemImage: "plus") {
+                viewModel.startNewDialog()
             }
         }
     }
@@ -240,10 +271,6 @@ struct AssistantChatView: View {
                         ForEach(viewModel.messages) { message in
                             AssistantMessageBubble(message: message)
                         }
-                    }
-
-                    if viewModel.isLoading {
-                        loadingBubble
                     }
 
                     if shouldShowRetry {
@@ -292,23 +319,6 @@ struct AssistantChatView: View {
         .padding(.horizontal, 16)
     }
 
-    private var loadingBubble: some View {
-        HStack {
-            HStack(spacing: 8) {
-                ProgressView()
-                    .progressViewStyle(.circular)
-                Text(viewModel.selectedPersona == .stesha ? "Стеша думает..." : "Пеликаша думает...")
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .myherzenAdaptiveGlassCard(cornerRadius: 16)
-            Spacer(minLength: 40)
-        }
-        .padding(.horizontal, 16)
-    }
-
     private var retryButton: some View {
         Button {
             viewModel.retryLastMessage()
@@ -328,10 +338,11 @@ struct AssistantChatView: View {
             text: $viewModel.inputText,
             isThinking: viewModel.isLoading,
             placeholder: placeholder,
+            thinkingPlaceholder: thinkingPlaceholder,
             sendSymbolName: "paperplane.fill",
             isDisabled: !runtimeConfig.settings.aiEnabled,
             onSend: sendMessageIfAllowed,
-            onCancel: viewModel.cancel,
+            onCancel: viewModel.cancelCurrentRequest,
             themedShape: activeTheme.inputShape
         )
         .padding(.horizontal, 12)
@@ -359,6 +370,15 @@ struct AssistantChatView: View {
             return "Спросить Пеликашу..."
         case .stesha:
             return "Спросить Стешу..."
+        }
+    }
+
+    private var thinkingPlaceholder: String {
+        switch viewModel.selectedPersona {
+        case .pelikasha:
+            return "Пеликаша думает..."
+        case .stesha:
+            return "Стеша думает..."
         }
     }
 
@@ -401,6 +421,25 @@ struct AssistantChatView: View {
         withAnimation(.easeOut(duration: 0.2)) {
             proxy.scrollTo("assistant-bottom", anchor: .bottom)
         }
+    }
+
+    private func headerIconButton(
+        systemImage: String,
+        accessibilityLabel: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            ThemedChrome(shape: activeTheme.headerShape) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.primary)
+                    .frame(width: 36, height: 36)
+                    .background(Color.clear)
+                    .contentShape(Circle())
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
     }
 }
 
@@ -530,7 +569,7 @@ private struct AssistantPersonaCard: View {
 }
 
 private struct AssistantMessageBubble: View {
-    let message: AssistantMessage
+    let message: PelikashaMessage
     @Environment(\.myherzenSurfaceStrokeOpacity) private var strokeOpacity
 
     var body: some View {

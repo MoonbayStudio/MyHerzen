@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import ru.moonbaystudio.myherzen.data.model.ScheduleItem
+import ru.moonbaystudio.myherzen.data.remote.dto.Homework
 import ru.moonbaystudio.myherzen.data.repository.AuthRepository
 import ru.moonbaystudio.myherzen.data.repository.ScheduleRepository
 import ru.moonbaystudio.myherzen.data.repository.SettingsRepository
@@ -42,14 +43,19 @@ class ScheduleViewModel @Inject constructor(
 
     private val _groupId = MutableStateFlow<Int?>(null)
     val selectedGroupId: StateFlow<Int?> = _groupId.asStateFlow()
-    private val _selectedDate = MutableStateFlow(Date())
+    private val _selectedDate = MutableStateFlow(Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, 0)
+        set(Calendar.MINUTE, 0)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.time)
     val selectedDate: StateFlow<Date> = _selectedDate.asStateFlow()
     private val _examOnly = MutableStateFlow(false)
 
     private val _temporaryItems = MutableStateFlow<Map<String, List<ScheduleItem>>>(emptyMap())
 
-    private val _homeworks = MutableStateFlow<Map<String, ru.moonbaystudio.myherzen.data.remote.Homework>>(emptyMap())
-    val homeworks: StateFlow<Map<String, ru.moonbaystudio.myherzen.data.remote.Homework>> = _homeworks.asStateFlow()
+    private val _homeworks = MutableStateFlow<Map<String, Homework>>(emptyMap())
+    val homeworks: StateFlow<Map<String, Homework>> = _homeworks.asStateFlow()
 
     val currentUser = authRepository.currentUser
 
@@ -63,13 +69,21 @@ class ScheduleViewModel @Inject constructor(
         DataState(id, date, dateStr, exam, temp[dateStr])
     }.flatMapLatest { state ->
         if (state.id != null) {
-            repository.getScheduleFlow(state.id, state.date, state.examOnly).map { local ->
-                if (local.isEmpty() && state.tempItems != null) state.tempItems else local
-            }
+            repository.getScheduleFlow(state.id, state.date, state.examOnly)
+                .map { local ->
+                    // Priority: Local Cache > Temporary remote items
+                    if (local.isNotEmpty()) local
+                    else if (state.tempItems != null) state.tempItems
+                    else emptyList()
+                }
+                .scan(emptyList<ScheduleItem>()) { previous, next ->
+                    // If next is empty but we are loading OR we had data and Room hasn't emitted yet, keep previous
+                    if (next.isEmpty() && (_isLoading.value || previous.isNotEmpty())) previous else next
+                }
         } else {
             flowOf(emptyList())
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(30000), emptyList())
 
     data class DataState(
         val id: Int?,
@@ -89,10 +103,20 @@ class ScheduleViewModel @Inject constructor(
     }
 
     fun setDate(date: Date) {
-        val oldDate = _selectedDate.value
-        _selectedDate.value = date
-        
-        // If date changed significantly or we are in cache mode, check cache
+        val normalizedDate = Calendar.getInstance().apply {
+            time = date
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.time
+
+        if (_selectedDate.value == normalizedDate) return
+
+        _selectedDate.value = normalizedDate
+        // Clear warning and offline status on date change
+        _showLastDayWarning.value = false
+        _isOffline.value = false
         checkCacheAndLoad()
     }
 
@@ -100,11 +124,14 @@ class ScheduleViewModel @Inject constructor(
         val groupId = _groupId.value ?: return
         val date = _selectedDate.value
         val examOnly = _examOnly.value
-        
+
         viewModelScope.launch {
             _isLoading.value = true
             try {
-                repository.refreshSchedule(groupId, date, examOnly)
+                // Ensure we are in "loading" state for scan operator
+                kotlinx.coroutines.delay(50)
+                repository.refreshScheduleRange(groupId, date, date, examOnly)
+
                 if (!examOnly) {
                     val homeworkList = repository.getHomeworks(groupId, date)
                     _homeworks.value = homeworkList.associateBy { homeworkKey(it.lessonDate, it.lessonTime, it.subject) }
@@ -112,21 +139,16 @@ class ScheduleViewModel @Inject constructor(
                 _refreshStatus.value = RefreshStatus.Success
                 _isOffline.value = false
             } catch (e: Exception) {
-                val errorMsg = when (e) {
-                    is java.net.UnknownHostException -> {
-                        _isOffline.value = true
-                        "Нет интернета"
-                    }
-                    is java.net.ConnectException -> {
-                        _isOffline.value = true
-                        "Сервер недоступен"
-                    }
+                val errorMsg = when {
+                    e is retrofit2.HttpException && e.code() == 400 -> "Ошибка 400: Неверный запрос к API"
+                    e is java.net.UnknownHostException -> "Нет интернета"
+                    e is java.net.ConnectException -> "Сервер недоступен"
                     else -> e.message ?: "Ошибка обновления"
                 }
                 _refreshStatus.value = RefreshStatus.Error(errorMsg)
             } finally {
                 _isLoading.value = false
-                kotlinx.coroutines.delay(1000)
+                kotlinx.coroutines.delay(2000)
                 _refreshStatus.value = null
             }
         }
@@ -138,25 +160,38 @@ class ScheduleViewModel @Inject constructor(
         val examOnly = _examOnly.value
 
         viewModelScope.launch {
-            val cacheEnabled = settingsRepository.offlineScheduleEnabled.first()
-            val cacheWeeks = settingsRepository.offlineScheduleWeeks.first()
+            try {
+                val cacheWeeks = settingsRepository.scheduleCacheWeeks.first().coerceIn(1, 4)
 
-            if (cacheEnabled) {
                 if (examOnly) {
                     val hasSession = repository.hasSession(groupId)
                     if (!hasSession) {
                         try {
                             repository.refreshSchedule(groupId, date, true)
-                        } catch (e: Exception) {}
+                            _isOffline.value = false
+                        } catch (e: Exception) {
+                            _isOffline.value = true
+                        }
                     }
                 } else {
                     val hasData = repository.hasDataForDate(groupId, date)
-                    val minDate = repository.getMinCachedDate(groupId)
-                    
+                    val maxCached = repository.getMaxCachedDate(groupId)
+
                     if (!hasData) {
-                        if (minDate != null && date.before(minDate)) {
-                            // Date is before min cached date (likely cleared)
-                            // Fetch without saving to cache
+                        val today = Calendar.getInstance().apply {
+                            set(Calendar.HOUR_OF_DAY, 0)
+                            set(Calendar.MINUTE, 0)
+                            set(Calendar.SECOND, 0)
+                            set(Calendar.MILLISECOND, 0)
+                        }.time
+
+                        val rangeEnd = Calendar.getInstance().apply {
+                            time = today
+                            add(Calendar.WEEK_OF_YEAR, cacheWeeks)
+                        }.time
+
+                        if (date.before(today) || date.after(rangeEnd)) {
+                            _isLoading.value = true
                             try {
                                 val remoteItems = repository.fetchSchedule(groupId, date, false)
                                 val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date)
@@ -164,91 +199,68 @@ class ScheduleViewModel @Inject constructor(
                                 _isOffline.value = false
                             } catch (e: Exception) {
                                 _isOffline.value = true
+                                _refreshStatus.value = RefreshStatus.Error("Ошибка загрузки")
+                            } finally {
+                                _isLoading.value = false
                             }
                         } else {
-                            // Fetch range and save to cache
                             try {
-                                loadCacheRange(groupId, date, cacheWeeks)
+                                loadCacheRange(groupId, today, cacheWeeks)
                                 _isOffline.value = false
                             } catch (e: Exception) {
-                                try { 
-                                    repository.refreshSchedule(groupId, date, false)
-                                    _isOffline.value = false
-                                } catch (e2: Exception) {
-                                    _isOffline.value = true
-                                }
+                                _isOffline.value = true
                             }
                         }
                     }
 
-                    // Check if it's the last day in cache
-                    val maxDate = repository.getMaxCachedDate(groupId)
-                    if (maxDate != null) {
-                        val cal = Calendar.getInstance()
-                        cal.time = maxDate
-                        val maxDateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(cal.time)
+                    if (maxCached != null) {
+                        val maxDateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(maxCached)
                         val currentDateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date)
-                        
+
                         if (maxDateStr == currentDateStr) {
-                            // Try to extend
                             try {
-                                extendCache(groupId, date, cacheWeeks)
+                                // Load next weeks BEFORE deleting old ones to avoid gap
+                                loadCacheRange(groupId, date, cacheWeeks)
+
+                                val oneWeekAgo = Calendar.getInstance().apply {
+                                    add(Calendar.WEEK_OF_YEAR, -1)
+                                }
+                                repository.deleteScheduleBefore(groupId, SimpleDateFormat("yyyy-MM-dd", Locale.US).format(oneWeekAgo.time))
+                                _isOffline.value = false
                             } catch (e: Exception) {
                                 _showLastDayWarning.value = true
                             }
                         }
                     }
 
-                    // Fetch homeworks for this day
                     try {
                         val homeworkList = repository.getHomeworks(groupId, date)
                         _homeworks.value = homeworkList.associateBy { homeworkKey(it.lessonDate, it.lessonTime, it.subject) }
                     } catch (e: Exception) {}
                 }
-            } else {
-                // Not using cache, always refresh current day
-                refresh()
+            } catch (e: Exception) {
+                _refreshStatus.value = RefreshStatus.Error("Ошибка: ${e.message}")
             }
         }
     }
 
     private suspend fun loadCacheRange(groupId: Int, startDate: Date, weeks: Int) {
-        val cal = Calendar.getInstance()
-        cal.time = startDate
-        
-        // Start from beginning of previous week
-        cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
-        cal.add(Calendar.WEEK_OF_YEAR, -1)
-        val rangeStart = cal.time
-        
-        // Go N weeks forward from current date
-        cal.time = startDate
-        cal.add(Calendar.WEEK_OF_YEAR, weeks)
-        val rangeEnd = cal.time
-        
-        repository.refreshScheduleRange(groupId, rangeStart, rangeEnd, false)
-        // Also load session
-        repository.refreshSchedule(groupId, startDate, true)
-        
-        // Cleanup
-        repository.cleanOldCache(groupId, startDate)
-    }
-
-    private suspend fun extendCache(groupId: Int, fromDate: Date, weeks: Int) {
-        val cal = Calendar.getInstance()
-        cal.time = fromDate
-        cal.add(Calendar.DAY_OF_YEAR, 1)
-        val startDate = cal.time
-        cal.add(Calendar.WEEK_OF_YEAR, weeks)
-        val endDate = cal.time
-        
         try {
-            repository.refreshScheduleRange(groupId, startDate, endDate, false)
-            repository.cleanOldCache(groupId, fromDate)
+            _isLoading.value = true
+            val cal = Calendar.getInstance()
+            cal.time = startDate
+            val rangeStart = startDate
+            cal.add(Calendar.WEEK_OF_YEAR, weeks)
+            val rangeEnd = cal.time
+
+            repository.refreshScheduleRange(groupId, rangeStart, rangeEnd, false)
+            repository.refreshSchedule(groupId, startDate, true)
             _isOffline.value = false
         } catch (e: Exception) {
             _isOffline.value = true
             throw e
+        } finally {
+            _isLoading.value = false
         }
     }
 
@@ -271,7 +283,6 @@ class ScheduleViewModel @Inject constructor(
                     _homeworks.value = emptyMap()
                 }
             } catch (e: Exception) {
-                // Handle error
             } finally {
                 _isLoading.value = false
             }
@@ -282,7 +293,7 @@ class ScheduleViewModel @Inject constructor(
         return "$date|$time|$subject"
     }
 
-    fun getHomeworkForKey(date: String, time: String, subject: String): ru.moonbaystudio.myherzen.data.remote.Homework? {
+    fun getHomeworkForKey(date: String, time: String, subject: String): Homework? {
         return _homeworks.value[homeworkKey(date, time, subject)]
     }
 

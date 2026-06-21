@@ -31,7 +31,7 @@ struct ScheduleItemCard: View {
                 Text(item.period)
                     .font(.title2)
                     .fontWeight(.semibold)
-                    .foregroundColor(.white)
+                    .foregroundColor(.primary)
             }
             HStack {
                 Text(item.time)

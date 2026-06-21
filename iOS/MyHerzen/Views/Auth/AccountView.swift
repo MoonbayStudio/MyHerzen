@@ -9,6 +9,7 @@ import Cocoa
 
 struct AccountView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject var scheduleViewModel: ScheduleViewModel
     @AppStorage("selectedThemeID") private var selectedThemeID = AppThemeCatalog.default
     @AppStorage("appleUserID") private var appleUserID = ""
     @AppStorage("selectedGroupId") private var selectedGroupId = ""
@@ -45,6 +46,8 @@ struct AccountView: View {
     private let externalToolbarTitle: Binding<String>?
     private let externalToolbarShowsBackButton: Binding<Bool>?
     private let externalToolbarBackRequest: Binding<Int>?
+    private let externalToolbarShowsRefreshButton: Binding<Bool>?
+    private let externalToolbarRefreshRequest: Binding<Int>?
 
     private enum AccountScreen: Equatable {
         case root
@@ -83,16 +86,22 @@ struct AccountView: View {
 
     private let backSwipeConfig = BackSwipeConfig.default
 
-    init(showPremiumScreen: Binding<Bool>? = nil,
+    init(scheduleViewModel: ScheduleViewModel,
+         showPremiumScreen: Binding<Bool>? = nil,
          nestedScreenPresented: Binding<Bool>? = nil,
          toolbarTitle: Binding<String>? = nil,
          toolbarShowsBackButton: Binding<Bool>? = nil,
-         toolbarBackRequest: Binding<Int>? = nil) {
+         toolbarBackRequest: Binding<Int>? = nil,
+         toolbarShowsRefreshButton: Binding<Bool>? = nil,
+         toolbarRefreshRequest: Binding<Int>? = nil) {
+        self.scheduleViewModel = scheduleViewModel
         self.externalShowPremiumScreen = showPremiumScreen
         self.externalNestedScreenPresented = nestedScreenPresented
         self.externalToolbarTitle = toolbarTitle
         self.externalToolbarShowsBackButton = toolbarShowsBackButton
         self.externalToolbarBackRequest = toolbarBackRequest
+        self.externalToolbarShowsRefreshButton = toolbarShowsRefreshButton
+        self.externalToolbarRefreshRequest = toolbarRefreshRequest
     }
 
     private var activeTheme: AppTheme {
@@ -237,7 +246,10 @@ struct AccountView: View {
             AdminUsersView(onBack: triggerAccountBackNavigation,
                            toolbarTitle: externalToolbarTitle,
                            toolbarShowsBackButton: externalToolbarShowsBackButton,
-                           toolbarBackRequest: externalToolbarBackRequest)
+                           toolbarBackRequest: externalToolbarBackRequest,
+                           toolbarShowsRefreshButton: externalToolbarShowsRefreshButton,
+                           toolbarRefreshRequest: externalToolbarRefreshRequest,
+                           scheduleViewModel: scheduleViewModel)
         case .security:
             securityScreen
         case .devices:
@@ -275,7 +287,10 @@ struct AccountView: View {
             AdminUsersView(onBack: triggerAccountBackNavigation,
                            toolbarTitle: externalToolbarTitle,
                            toolbarShowsBackButton: externalToolbarShowsBackButton,
-                           toolbarBackRequest: externalToolbarBackRequest)
+                           toolbarBackRequest: externalToolbarBackRequest,
+                           toolbarShowsRefreshButton: externalToolbarShowsRefreshButton,
+                           toolbarRefreshRequest: externalToolbarRefreshRequest,
+                           scheduleViewModel: scheduleViewModel)
         case .security:
             securityScreen
         case .devices:
@@ -332,12 +347,12 @@ struct AccountView: View {
         accountScreenDragOffset = 0
         withAnimation(.easeInOut(duration: 0.18)) {
             accountScreen = screen
+            syncToolbarNavigationState(screen)
         }
         if screen == .premium {
             premiumScreenBinding.wrappedValue = true
         }
         syncNestedScreenState()
-        syncToolbarNavigationState(screen)
     }
 
     private func resetAccountScreen() {
@@ -376,7 +391,9 @@ struct AccountView: View {
             }
             profileErrorMessage = nil
             syncNestedScreenState()
-            syncToolbarNavigationState(targetScreen)
+            withAnimation(.easeInOut(duration: 0.18)) {
+                syncToolbarNavigationState(targetScreen)
+            }
         }
     }
 
@@ -384,6 +401,9 @@ struct AccountView: View {
         let currentScreen = screen ?? accountScreen
         externalToolbarTitle?.wrappedValue = toolbarTitle(for: currentScreen)
         externalToolbarShowsBackButton?.wrappedValue = currentScreen != .root
+        if currentScreen != .adminUsers {
+            externalToolbarShowsRefreshButton?.wrappedValue = false
+        }
     }
 
     private func toolbarTitle(for screen: AccountScreen) -> String {

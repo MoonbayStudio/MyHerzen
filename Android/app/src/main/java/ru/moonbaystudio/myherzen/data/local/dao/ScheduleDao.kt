@@ -24,6 +24,9 @@ interface ScheduleDao {
     @Query("DELETE FROM schedule_items WHERE groupId = :groupId AND date < :date AND period = ''")
     suspend fun deleteScheduleBefore(groupId: Int, date: String)
 
+    @Query("DELETE FROM schedule_items WHERE groupId = :groupId AND date > :date AND period = ''")
+    suspend fun deleteScheduleAfter(groupId: Int, date: String)
+
     @Query("SELECT MAX(date) FROM schedule_items WHERE groupId = :groupId AND period = ''")
     suspend fun getMaxDate(groupId: Int): String?
 

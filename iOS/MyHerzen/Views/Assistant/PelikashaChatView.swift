@@ -252,22 +252,6 @@ struct PelikashaChatView: View {
                             MessageBubble(message: message)
                         }
 
-                        if viewModel.isLoading {
-                            HStack {
-                                HStack(spacing: 8) {
-                                    ProgressView()
-                                        .progressViewStyle(.circular)
-                                    Text("думаю…")
-                                        .font(.footnote)
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding(10)
-                                .myherzenAdaptiveGlassCard(cornerRadius: 16)
-                                Spacer()
-                            }
-                            .padding(.horizontal, 16)
-                        }
-
                         Color.clear
                             .frame(height: 1)
                             .id("bottom")
@@ -299,6 +283,7 @@ struct PelikashaChatView: View {
                 isThinking: viewModel.isLoading,
                 isCancelling: viewModel.isCancelling,
                 placeholder: "Напиши Пеликаше…",
+                thinkingPlaceholder: "Пеликаша думает...",
                 sendSymbolName: "paperplane.fill",
                 onSend: {
                     viewModel.sendMessage()
@@ -373,7 +358,7 @@ struct PelikashaChatView: View {
     }
 }
 
-private struct PelikashaHistoryView: View {
+struct PelikashaHistoryView: View {
     let history: [PelikashaChatViewModel.DialogRecord]
     let currentDialogID: UUID
     let openDialog: (UUID) -> Void
@@ -434,6 +419,9 @@ private struct PelikashaHistoryView: View {
                             Text(dialog.title)
                                 .font(.headline)
                                 .lineLimit(1)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .clipped()
                             Text(Self.dateFormatter.string(from: dialog.updatedAt))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
@@ -526,12 +514,12 @@ private struct MessageBubble: View {
 
     var body: some View {
         HStack {
-            if message.role == .assistant {
-                bubble
+            if message.role == .user {
                 Spacer(minLength: 40)
+                bubble
             } else {
-                Spacer(minLength: 40)
                 bubble
+                Spacer(minLength: 40)
             }
         }
         .padding(.horizontal, 16)
@@ -547,6 +535,8 @@ private struct MessageBubble: View {
                 Group {
                     if message.role == .user {
                         Color.accentColor
+                    } else if message.role == .systemLocal {
+                        Color.orange.opacity(0.14)
                     } else {
                         MyHerzenAdaptiveMaterialFill()
                     }
@@ -555,7 +545,7 @@ private struct MessageBubble: View {
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(message.role == .user ? Color.clear : Color.white.opacity(strokeOpacity), lineWidth: 0.8)
+                    .stroke(message.role == .user ? Color.clear : (message.role == .systemLocal ? Color.orange.opacity(0.28) : Color.white.opacity(strokeOpacity)), lineWidth: 0.8)
             )
     }
 }

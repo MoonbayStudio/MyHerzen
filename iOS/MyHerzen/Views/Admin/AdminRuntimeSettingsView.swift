@@ -86,7 +86,9 @@ final class AdminRuntimeSettingsViewModel: ObservableObject {
 
 struct AdminRuntimeSettingsView: View {
     let activeTheme: AppTheme
+    @ObservedObject var scheduleViewModel: ScheduleViewModel
     let onBack: () -> Void
+    var toolbarRefreshRequest: Binding<Int>? = nil
 
     @StateObject private var viewModel = AdminRuntimeSettingsViewModel()
 
@@ -102,15 +104,19 @@ struct AdminRuntimeSettingsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(ThemedBackground(theme: activeTheme).ignoresSafeArea())
         .myherzenTask { await viewModel.load() }
+        .onChange(of: toolbarRefreshRequest?.wrappedValue ?? 0) { _ in
+            guard toolbarRefreshRequest != nil else { return }
+            Task { await viewModel.load() }
+        }
     }
 
+    @ViewBuilder
     private var header: some View {
-        HStack(spacing: 10) {
 #if os(iOS)
-            MyHerzenTitleBackHeader(shape: activeTheme.headerShape, title: "Настройки") {
+        HStack(spacing: 10) {
+            MyHerzenTitleBackHeader(shape: activeTheme.headerShape, title: "Дебаг") {
                 onBack()
             }
-#endif
             Spacer(minLength: 0)
             Button {
                 Task { await viewModel.load() }
@@ -122,6 +128,9 @@ struct AdminRuntimeSettingsView: View {
             .myherzenDefaultSurface(cornerRadius: 18, padding: 0)
             .disabled(viewModel.isLoading)
         }
+#else
+        EmptyView()
+#endif
     }
 
     @ViewBuilder
@@ -151,23 +160,13 @@ struct AdminRuntimeSettingsView: View {
 
     @ViewBuilder
     private var content: some View {
-        if !viewModel.isLoading && viewModel.visibleSettings.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 28, weight: .medium))
-                    .foregroundColor(.accentColor)
-                Text("Настроек пока нет.")
-                    .font(.headline)
-                Text("Отображаются только whitelisted runtime-настройки.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            .padding(16)
-            .myherzenAdaptiveGlassCard(cornerRadius: 16)
-            .padding(.horizontal, 4)
-        } else {
-            ScrollView {
-                LazyVStack(spacing: 10) {
+        ScrollView {
+            LazyVStack(spacing: 10) {
+                AdminLiveActivityDebugSection(scheduleViewModel: scheduleViewModel)
+
+                if !viewModel.isLoading && viewModel.visibleSettings.isEmpty {
+                    emptyRuntimeSettingsCard
+                } else {
                     ForEach(viewModel.visibleSettings) { setting in
                         AdminRuntimeSettingRow(
                             setting: setting,
@@ -180,10 +179,235 @@ struct AdminRuntimeSettingsView: View {
                         )
                     }
                 }
-                .padding(.horizontal, 4)
-                .padding(.bottom, 24)
+            }
+            .padding(.horizontal, 4)
+            .padding(.bottom, 24)
+        }
+    }
+
+    private var emptyRuntimeSettingsCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 28, weight: .medium))
+                .foregroundColor(.accentColor)
+            Text("Runtime-настроек пока нет.")
+                .font(.headline)
+            Text("Отображаются только whitelisted runtime-настройки.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(16)
+        .myherzenAdaptiveGlassCard(cornerRadius: 16)
+    }
+}
+
+private struct AdminLiveActivityDebugSection: View {
+    @ObservedObject var scheduleViewModel: ScheduleViewModel
+    @State private var groupName = "Debug group"
+    @State private var firstTitle = "Первая пара"
+    @State private var firstTeacher = "Преподаватель 1"
+    @State private var firstLocation = "101"
+    @State private var firstStart = Date().addingTimeInterval(-5 * 60)
+    @State private var firstEnd = Date().addingTimeInterval(2 * 60)
+    @State private var secondTitle = "Вторая пара"
+    @State private var secondTeacher = "Преподаватель 2"
+    @State private var secondLocation = "202"
+    @State private var secondStart = Date().addingTimeInterval(4 * 60)
+    @State private var secondEnd = Date().addingTimeInterval(14 * 60)
+    @State private var statusMessage: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "bolt.badge.clock.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundColor(.accentColor)
+                    .frame(width: 28)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Лайв активити")
+                        .font(.headline)
+                    Text("Тест перехода: пара, перерыв, следующая пара.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            if !LiveActivityManager.shared.isSupported {
+                Label("Live Activities недоступны на этом устройстве или выключены в системе.", systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.orange)
+            }
+
+            labeledTextField("Группа", text: $groupName)
+
+            lessonEditor(
+                title: "Пара 1",
+                lessonTitle: $firstTitle,
+                teacher: $firstTeacher,
+                location: $firstLocation,
+                start: $firstStart,
+                end: $firstEnd
+            )
+
+            lessonEditor(
+                title: "Пара 2",
+                lessonTitle: $secondTitle,
+                teacher: $secondTeacher,
+                location: $secondLocation,
+                start: $secondStart,
+                end: $secondEnd
+            )
+
+            VStack(spacing: 8) {
+                debugButton("Загрузить тестовые пары", systemImage: "calendar.badge.plus", action: applyDebugSchedule)
+
+                HStack(spacing: 8) {
+                    debugButton("Пара сейчас", systemImage: "play.fill", action: prepareLessonNow)
+                    debugButton("Перерыв сейчас", systemImage: "pause.fill", action: prepareBreakNow)
+                }
+
+                debugButton("Остановить Live Activity", systemImage: "stop.fill", isDestructive: true, action: stopActivity)
+            }
+
+            if let statusMessage {
+                Label(statusMessage, systemImage: "checkmark.circle.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.green)
             }
         }
+        .myherzenDefaultSurface(cornerRadius: 18, padding: 14)
+    }
+
+    private func lessonEditor(
+        title: String,
+        lessonTitle: Binding<String>,
+        teacher: Binding<String>,
+        location: Binding<String>,
+        start: Binding<Date>,
+        end: Binding<Date>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+
+            labeledTextField("Название", text: lessonTitle)
+
+            HStack(spacing: 8) {
+                labeledTextField("Преподаватель", text: teacher)
+                labeledTextField("Аудитория", text: location)
+            }
+
+            HStack(spacing: 8) {
+                dateField("Начало", date: start)
+                dateField("Конец", date: end)
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.primary.opacity(0.045))
+        )
+    }
+
+    private func labeledTextField(_ title: String, text: Binding<String>) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(.secondary)
+            TextField(title, text: text)
+                .textFieldStyle(.roundedBorder)
+        }
+    }
+
+    private func dateField(_ title: String, date: Binding<Date>) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(.secondary)
+            DatePicker(title, selection: date, displayedComponents: [.hourAndMinute])
+                .labelsHidden()
+                .datePickerStyle(.compact)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func debugButton(
+        _ title: String,
+        systemImage: String,
+        isDestructive: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.caption.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 38)
+        }
+        .runtimeDebugButtonStyle()
+        .foregroundColor(isDestructive ? .red : nil)
+    }
+
+    private func applyDebugSchedule() {
+        let range = normalizedRange(start: firstStart, end: firstEnd)
+        let secondRange = normalizedRange(start: secondStart, end: secondEnd)
+        scheduleViewModel.applyDebugScheduleForLiveActivity(
+            groupName: trimmed(groupName, fallback: "Debug group"),
+            lessons: [
+                ScheduleViewModel.DebugLesson(
+                    title: trimmed(firstTitle, fallback: "Первая пара"),
+                    teacher: trimmed(firstTeacher, fallback: "Преподаватель"),
+                    location: trimmed(firstLocation, fallback: "Аудитория"),
+                    start: range.start,
+                    end: range.end
+                ),
+                ScheduleViewModel.DebugLesson(
+                    title: trimmed(secondTitle, fallback: "Вторая пара"),
+                    teacher: trimmed(secondTeacher, fallback: "Преподаватель"),
+                    location: trimmed(secondLocation, fallback: "Аудитория"),
+                    start: secondRange.start,
+                    end: secondRange.end
+                )
+            ]
+        )
+        statusMessage = "Тестовые пары загружены в реальный поток расписания."
+    }
+
+    private func prepareLessonNow() {
+        let now = Date()
+        firstStart = now.addingTimeInterval(-5 * 60)
+        firstEnd = now.addingTimeInterval(2 * 60)
+        secondStart = now.addingTimeInterval(4 * 60)
+        secondEnd = now.addingTimeInterval(14 * 60)
+        applyDebugSchedule()
+    }
+
+    private func prepareBreakNow() {
+        let now = Date()
+        firstStart = now.addingTimeInterval(-12 * 60)
+        firstEnd = now.addingTimeInterval(-2 * 60)
+        secondStart = now.addingTimeInterval(3 * 60)
+        secondEnd = now.addingTimeInterval(13 * 60)
+        applyDebugSchedule()
+    }
+
+    private func stopActivity() {
+        LiveActivityManager.shared.endIfNeeded()
+        statusMessage = "Live Activity остановлена."
+    }
+
+    private func normalizedRange(start: Date, end: Date) -> (start: Date, end: Date) {
+        if end > start {
+            return (start, end)
+        }
+        return (start, start.addingTimeInterval(45 * 60))
+    }
+
+    private func trimmed(_ value: String, fallback: String) -> String {
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedValue.isEmpty ? fallback : trimmedValue
     }
 }
 
@@ -284,5 +508,26 @@ private struct AdminRuntimeSettingRow: View {
         case "SCHEDULE_CACHE_TTL_SECONDS": return "TTL кэша расписания"
         default: return setting.key
         }
+    }
+}
+
+private struct RuntimeDebugButtonStyleModifier: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+#if os(macOS)
+        if #available(macOS 12.0, *) {
+            content.buttonStyle(.borderedProminent)
+        } else {
+            content.buttonStyle(.bordered)
+        }
+#else
+        content.buttonStyle(.borderedProminent)
+#endif
+    }
+}
+
+private extension View {
+    func runtimeDebugButtonStyle() -> some View {
+        modifier(RuntimeDebugButtonStyleModifier())
     }
 }

@@ -7,8 +7,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import ru.moonbaystudio.myherzen.data.remote.AccountSession
-import ru.moonbaystudio.myherzen.data.remote.AppleUser
+import ru.moonbaystudio.myherzen.data.remote.dto.AccountSession
+import ru.moonbaystudio.myherzen.data.remote.dto.AppleUser
 import ru.moonbaystudio.myherzen.data.repository.AuthRepository
 import javax.inject.Inject
 

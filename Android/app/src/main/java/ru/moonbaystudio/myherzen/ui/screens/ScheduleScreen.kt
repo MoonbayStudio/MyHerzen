@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import ru.moonbaystudio.myherzen.data.remote.dto.Homework
 import ru.moonbaystudio.myherzen.data.model.ScheduleItem
 import ru.moonbaystudio.myherzen.ui.components.ActionCapsule
 import ru.moonbaystudio.myherzen.ui.components.CapsuleHeader
@@ -186,7 +187,7 @@ fun ScheduleScreen(
 @Composable
 fun ScheduleItemCard(
     item: ScheduleItem,
-    homework: ru.moonbaystudio.myherzen.data.remote.Homework? = null,
+    homework: Homework? = null,
     canEdit: Boolean = false,
     onHomeworkClick: () -> Unit
 ) {
@@ -246,7 +247,7 @@ fun ScheduleItemCard(
 @Composable
 fun HomeworkDialog(
     lesson: ScheduleItem,
-    homework: ru.moonbaystudio.myherzen.data.remote.Homework?,
+    homework: Homework?,
     canEdit: Boolean,
     onDismiss: () -> Unit,
     onSave: (String) -> Unit,

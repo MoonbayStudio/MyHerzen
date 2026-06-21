@@ -11,7 +11,8 @@ import kotlinx.coroutines.launch
 import ru.moonbaystudio.myherzen.data.local.preferences.UserPreferences
 import ru.moonbaystudio.myherzen.data.model.AssistantMessage
 import ru.moonbaystudio.myherzen.data.model.AssistantPersona
-import ru.moonbaystudio.myherzen.data.remote.*
+import ru.moonbaystudio.myherzen.data.remote.MyHerzenApiService
+import ru.moonbaystudio.myherzen.data.remote.dto.*
 import ru.moonbaystudio.myherzen.data.repository.ScheduleRepository
 import java.text.SimpleDateFormat
 import java.util.*
@@ -62,16 +63,9 @@ class AssistantViewModel @Inject constructor(
             _isLoading.value = true
             try {
                 val groupId = userPreferences.selectedGroupId.first()
-                val date = Date() // Simplified for now, iOS parses date from message
+                val date = Date()
                 val dateStr = requestDateFormatter.format(date)
                 
-                // Get cached schedule for context
-                val cachedLessons = if (groupId != null) {
-                    // This is a bit complex as we need a List, but getScheduleFlow returns a Flow
-                    // For now, let's just send without schedule or implement a sync fetch in repo
-                    emptyList<CachedScheduleLessonPayload>()
-                } else emptyList()
-
                 val request = AssistantChatRequest(
                     message = text,
                     persona = _selectedPersona.value.rawValue,
@@ -79,7 +73,7 @@ class AssistantViewModel @Inject constructor(
                     conversationId = conversationId,
                     groupId = groupId,
                     targetDate = dateStr,
-                    cachedSchedule = if (cachedLessons.isNotEmpty()) CachedSchedulePayload(isoFormatter.format(Date()), lessons = cachedLessons) else null
+                    cachedSchedule = null // Simplified for now
                 )
 
                 val response = apiService.assistantChat(request)
@@ -96,14 +90,5 @@ class AssistantViewModel @Inject constructor(
                 _isLoading.value = false
             }
         }
-    }
-}
-
-// Helper for firstOrNull on Flow
-suspend fun <T> kotlinx.coroutines.flow.Flow<T>.firstOrNullCustom(predicate: suspend (T) -> Boolean = { true }): T? {
-    return try {
-        this.first(predicate)
-    } catch (e: Exception) {
-        null
     }
 }

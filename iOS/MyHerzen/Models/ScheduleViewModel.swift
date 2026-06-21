@@ -34,6 +34,19 @@ final class ScheduleViewModel: ObservableObject {
         let nextSubtitle: String?
     }
 
+    private struct LiveActivityScheduleSnapshot: Codable {
+        let groupName: String
+        let items: [ScheduleItem]
+    }
+
+    struct DebugLesson {
+        let title: String
+        let teacher: String
+        let location: String
+        let start: Date
+        let end: Date
+    }
+
     private enum OfflineCacheConfig {
         static let enabledKey = "offlineScheduleEnabled"
         static let weeksKey = "offlineScheduleWeeks"
@@ -57,8 +70,10 @@ final class ScheduleViewModel: ObservableObject {
     private var sessionCache: [String: [ScheduleItem]] = [:]
     private var offlineScheduleCache: [String: [ScheduleItem]] = [:]
     private var protectVisibleCacheUntil: Date?
+    private var liveActivityGroupOverride: String?
     private let sessionCacheFileName = "session_cache.json"
     private let offlineCacheFileName = "offline_schedule_cache.json"
+    private let liveActivitySnapshotFileName = "live_activity_schedule_snapshot.json"
     private let offlineCachePrimedPrefix = "offlineCachePrimedV2"
     private var activityTicker: AnyCancellable?
     @Published var savedGroupId: String {
@@ -78,6 +93,14 @@ final class ScheduleViewModel: ObservableObject {
     
     private static let fallbackISO8601DateFormatter: ISO8601DateFormatter = {
         ISO8601DateFormatter()
+    }()
+
+    private static let shortTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "HH:mm"
+        return formatter
     }()
 
     func loadOnce(groupId: String, date: Date, examOnly: Bool = false) async {
@@ -225,6 +248,7 @@ final class ScheduleViewModel: ObservableObject {
         displayedScheduleContext = displayContext(groupId: groupId, date: date, examOnly: examOnly)
         items = sorted
         await MainActor.run {
+            liveActivityGroupOverride = nil
             animatedItems = sorted
             refreshActiveLessonState()
         }
@@ -278,6 +302,7 @@ final class ScheduleViewModel: ObservableObject {
             refreshActiveLessonState()
             return
         }
+        liveActivityGroupOverride = nil
         displayedScheduleContext = context
         items = cachedItems
         animatedItems = cachedItems
@@ -553,6 +578,7 @@ final class ScheduleViewModel: ObservableObject {
         guard !groupId.isEmpty else { return }
         let cached = sessionCache[groupId] ?? []
         let prepared = sortItems(cached, examOnly: true)
+        liveActivityGroupOverride = nil
         hasConnectionError = false
         hasOfflineCacheMissForSelectedDay = false
         displayedScheduleContext = displayContext(groupId: groupId, date: Date(), examOnly: true)
@@ -569,22 +595,66 @@ final class ScheduleViewModel: ObservableObject {
     }
 
     func refreshLiveActivityFromCachedSchedule(date: Date = Date()) {
+        if let snapshot = Self.readLiveActivitySnapshotFromDisk(fileName: liveActivitySnapshotFileName) {
+            let sortedItems = sortItems(snapshot.items, examOnly: false)
+            liveActivityGroupOverride = snapshot.groupName
+            items = sortedItems
+            animatedItems = sortedItems
+            refreshActiveLessonState()
+            return
+        }
+
         guard !savedGroupId.isEmpty else {
-            LiveActivityManager.shared.endIfNeeded()
+            endLiveActivityAndClearSnapshot()
             return
         }
 
         offlineScheduleCache = Self.readSessionCacheFromDisk(fileName: offlineCacheFileName)
         let key = offlineCacheKey(groupId: savedGroupId, dateString: cacheDateString(from: date), examOnly: false)
         guard let cachedItems = offlineScheduleCache[key] else {
-            LiveActivityManager.shared.endIfNeeded()
+            endLiveActivityAndClearSnapshot()
             return
         }
 
         let sortedItems = sortItems(cachedItems, examOnly: false)
         cache[scheduleCacheKey(groupId: savedGroupId, date: date, examOnly: false)] = sortedItems
+        liveActivityGroupOverride = nil
         items = sortedItems
         animatedItems = sortedItems
+        refreshActiveLessonState()
+    }
+
+    func applyDebugScheduleForLiveActivity(groupName: String, lessons: [DebugLesson]) {
+        let preparedLessons = lessons
+            .filter { $0.end > $0.start }
+            .sorted { $0.start < $1.start }
+        guard !preparedLessons.isEmpty else { return }
+
+        let debugGroupName = groupName.myherzenTrimmed.isEmpty ? "Debug group" : groupName.myherzenTrimmed
+        let debugItems = preparedLessons.map { lesson in
+            ScheduleItem(
+                sortDateISO: Self.iso8601DateFormatter.string(from: lesson.start),
+                endDateISO: Self.iso8601DateFormatter.string(from: lesson.end),
+                time: Self.shortTimeFormatter.string(from: lesson.start),
+                title: lesson.title.myherzenTrimmed.isEmpty ? "Тестовая пара" : lesson.title.myherzenTrimmed,
+                teacher: lesson.teacher.myherzenTrimmed,
+                lessonType: "debug",
+                address: "",
+                subgroup: nil,
+                period: "\(Self.shortTimeFormatter.string(from: lesson.start))-\(Self.shortTimeFormatter.string(from: lesson.end))",
+                room: lesson.location.myherzenTrimmed,
+                classURL: nil
+            )
+        }
+
+        liveActivityGroupOverride = debugGroupName
+        displayedScheduleContext = displayContext(groupId: debugGroupName, date: Date(), examOnly: false)
+        items = debugItems
+        animatedItems = debugItems
+        isLoading = false
+        hasConnectionError = false
+        hasOfflineCacheMissForSelectedDay = false
+        isUsingOfflineCache = false
         refreshActiveLessonState()
     }
 
@@ -665,14 +735,14 @@ final class ScheduleViewModel: ObservableObject {
         guard UserDefaults.standard.bool(forKey: "notificationsEnabled") else {
             activeLesson = nil
             activeLessonProgress = 0
-            LiveActivityManager.shared.endIfNeeded()
+            endLiveActivityAndClearSnapshot()
             return
         }
 
         guard let event = currentLiveScheduleEvent(at: Date()) else {
             activeLesson = nil
             activeLessonProgress = 0
-            LiveActivityManager.shared.endIfNeeded()
+            endLiveActivityAndClearSnapshot()
             return
         }
 
@@ -681,10 +751,11 @@ final class ScheduleViewModel: ObservableObject {
         activeLesson = event.activeLesson
         activeLessonProgress = min(max(elapsed / total, 0), 1)
         guard isLiveActivityEnabled else {
-            LiveActivityManager.shared.endIfNeeded()
+            endLiveActivityAndClearSnapshot()
             return
         }
 
+        persistLiveActivitySnapshot(groupName: liveActivityGroupOverride ?? savedGroupId)
         LiveActivityManager.shared.updateOrStart(
             lessonTitle: event.title,
             teacher: event.teacher,
@@ -692,11 +763,24 @@ final class ScheduleViewModel: ObservableObject {
             startTime: event.start,
             endTime: event.end,
             progress: activeLessonProgress,
-            groupName: savedGroupId,
+            groupName: liveActivityGroupOverride ?? savedGroupId,
             nextTitle: event.nextTitle,
             nextTime: event.nextTime,
             nextSubtitle: event.nextSubtitle
         )
+    }
+
+    private func persistLiveActivitySnapshot(groupName: String) {
+        let snapshot = LiveActivityScheduleSnapshot(
+            groupName: groupName.myherzenTrimmed.isEmpty ? savedGroupId : groupName,
+            items: timedScheduleItems().map(\.item)
+        )
+        Self.writeLiveActivitySnapshotToDisk(snapshot, fileName: liveActivitySnapshotFileName)
+    }
+
+    private func endLiveActivityAndClearSnapshot() {
+        Self.removeLiveActivitySnapshotFromDisk(fileName: liveActivitySnapshotFileName)
+        LiveActivityManager.shared.endIfNeeded()
     }
 
     private func currentLiveScheduleEvent(at now: Date) -> LiveScheduleEvent? {
@@ -759,16 +843,29 @@ final class ScheduleViewModel: ObservableObject {
             end: end,
             nextTitle: next.item.title,
             nextTime: end,
-            nextSubtitle: lessonLocation(for: next.item)
+            nextSubtitle: nextLessonSubtitle(for: next.item)
         )
     }
 
     private func nextEventSummary(afterLessonEndingAt end: Date, next: TimedScheduleItem?) -> (title: String, time: Date, subtitle: String?)? {
         guard let next else { return nil }
-        if next.start.timeIntervalSince(end) > 60 {
-            return ("Перерыв", end, next.item.title)
+        return (next.item.title, next.start, nextLessonSubtitle(for: next.item))
+    }
+
+    private func nextLessonSubtitle(for item: ScheduleItem) -> String {
+        let teacher = item.teacher.myherzenTrimmed
+        let location = lessonLocation(for: item)
+
+        switch (teacher.isEmpty, location.isEmpty) {
+        case (false, false):
+            return "\(teacher), ауд. \(location)"
+        case (false, true):
+            return teacher
+        case (true, false):
+            return "ауд. \(location)"
+        case (true, true):
+            return ""
         }
-        return (next.item.title, next.start, lessonLocation(for: next.item))
     }
 
     private func lessonLocation(for item: ScheduleItem) -> String {
@@ -810,5 +907,26 @@ final class ScheduleViewModel: ObservableObject {
             return
         }
         try? data.write(to: url, options: .atomic)
+    }
+
+    private static func readLiveActivitySnapshotFromDisk(fileName: String) -> LiveActivityScheduleSnapshot? {
+        guard let url = sessionCacheURL(fileName: fileName),
+              let data = try? Data(contentsOf: url) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(LiveActivityScheduleSnapshot.self, from: data)
+    }
+
+    private static func writeLiveActivitySnapshotToDisk(_ snapshot: LiveActivityScheduleSnapshot, fileName: String) {
+        guard let url = sessionCacheURL(fileName: fileName),
+              let data = try? JSONEncoder().encode(snapshot) else {
+            return
+        }
+        try? data.write(to: url, options: .atomic)
+    }
+
+    private static func removeLiveActivitySnapshotFromDisk(fileName: String) {
+        guard let url = sessionCacheURL(fileName: fileName) else { return }
+        try? FileManager.default.removeItem(at: url)
     }
 }

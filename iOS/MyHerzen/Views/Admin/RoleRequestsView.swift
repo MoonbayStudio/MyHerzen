@@ -519,6 +519,7 @@ struct ModerationRoleRequestsView: View {
     @Environment(\.presentationMode) private var presentationMode
     @AppStorage("selectedThemeID") private var selectedThemeID = AppThemeCatalog.default
     var onBack: (() -> Void)? = nil
+    var toolbarRefreshRequest: Binding<Int>? = nil
     @StateObject private var authSession = AuthSessionManager.shared
     @State private var requests: [RoleRequest] = []
     @State private var isLoading = false
@@ -573,11 +574,16 @@ struct ModerationRoleRequestsView: View {
         .myherzenTask {
             await loadRequestsIfNeeded()
         }
+        .onChange(of: toolbarRefreshRequest?.wrappedValue ?? 0) { _ in
+            guard toolbarRefreshRequest != nil, canModerateRoles else { return }
+            Task { await loadRequests() }
+        }
     }
 
+    @ViewBuilder
     private var header: some View {
-        HStack(spacing: 10) {
 #if os(iOS)
+        HStack(spacing: 10) {
             MyHerzenTitleBackHeader(shape: activeTheme.headerShape, title: "Модерация ролей") {
                 if let onBack {
                     onBack()
@@ -587,9 +593,6 @@ struct ModerationRoleRequestsView: View {
             }
 
             Spacer()
-#else
-            Spacer(minLength: 0)
-#endif
 
             if canModerateRoles {
                 ThemedChrome(shape: activeTheme.headerShape) {
@@ -608,6 +611,9 @@ struct ModerationRoleRequestsView: View {
                 .accessibilityLabel("Обновить заявки")
             }
         }
+#else
+        EmptyView()
+#endif
     }
 
     private var retryButton: some View {

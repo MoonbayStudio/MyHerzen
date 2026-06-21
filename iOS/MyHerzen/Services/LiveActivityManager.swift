@@ -4,7 +4,7 @@ import Foundation
 import ActivityKit
 
 @available(iOS 16.1, *)
-struct MyHerzenLiveActivityAttributes: ActivityAttributes {
+struct ScheduleActivityAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
         var lessonTitle: String
         var teacher: String
@@ -52,7 +52,7 @@ final class LiveActivityManager {
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         ScheduleLiveActivityBackgroundScheduler.shared.register()
 
-        let state = MyHerzenLiveActivityAttributes.ContentState(
+        let state = ScheduleActivityAttributes.ContentState(
             lessonTitle: lessonTitle,
             teacher: teacher,
             location: location,
@@ -64,7 +64,7 @@ final class LiveActivityManager {
             nextSubtitle: nextSubtitle
         )
 
-        if let activity = Activity<MyHerzenLiveActivityAttributes>.activities.first {
+        if let activity = Activity<ScheduleActivityAttributes>.activities.first {
             Task {
                 await activity.update(using: state)
             }
@@ -72,7 +72,7 @@ final class LiveActivityManager {
             return
         }
 
-        let attributes = MyHerzenLiveActivityAttributes(groupName: groupName)
+        let attributes = ScheduleActivityAttributes(groupName: groupName)
         do {
             _ = try Activity.request(attributes: attributes, contentState: state)
             ScheduleLiveActivityBackgroundScheduler.shared.scheduleRefresh(at: endTime)
@@ -84,7 +84,7 @@ final class LiveActivityManager {
     func endIfNeeded() {
         guard #available(iOS 16.1, *) else { return }
         Task {
-            for activity in Activity<MyHerzenLiveActivityAttributes>.activities {
+            for activity in Activity<ScheduleActivityAttributes>.activities {
                 await activity.end(dismissalPolicy: .immediate)
             }
         }

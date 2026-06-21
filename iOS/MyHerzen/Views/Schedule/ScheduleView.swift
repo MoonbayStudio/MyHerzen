@@ -64,6 +64,7 @@ struct ScheduleView: View {
     var groupId: String
     var examOnly: Bool = false
     var onScrollChromeChange: (_ topChromeVisible: Bool, _ bottomIslandVisible: Bool) -> Void = { _, _ in }
+    var externalRefreshRequest: Int = 0
     @State private var showHomeworkUnavailable = false
     @State private var homeworksByLessonKey: [String: Homework] = [:]
     @State private var selectedHomeworkSheet: HomeworkSheetSelection?
@@ -72,7 +73,6 @@ struct ScheduleView: View {
     @State private var refreshNoticeID = UUID()
     @State private var showLastCachedDayWarning = false
     @State private var lastContentTopY: CGFloat?
-    @State private var lastDragY: CGFloat?
 
     private static let homeworkDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -373,8 +373,8 @@ struct ScheduleView: View {
                                 message: viewModel.hasOfflineCacheMissForSelectedDay
                                     ? "Нет подключения к API, и пары на выбранный день не загружены в кэш."
                                     : (viewModel.hasConnectionError
-                                       ? "Ошибка подключения. Выключи VPN и потяни вниз для обновления."
-                                       : (examOnly ? "Сессия пуста. Потяни вниз для обновления" : "Нет пар на выбранную дату"))
+                                       ? connectionErrorMessage
+                                       : emptyScheduleMessage)
                             )
                             .frame(maxWidth: .infinity)
                             .frame(minHeight: geometry.size.height, alignment: .center)
@@ -409,13 +409,12 @@ struct ScheduleView: View {
                             .onPreferenceChange(ScheduleScrollTopPreferenceKey.self) { topY in
                                 handleScrollTopChange(topY)
                             }
-                            .simultaneousGesture(scheduleChromeDragGesture)
                             .refreshable {
                                 await performManualRefresh()
                             }
                         } else {
                             ScrollView {
-                                LazyVStack(spacing: 8) {
+                                LazyVStack(spacing: 12) {
                                     scrollChromeSensor
                                     ForEach(visibleAnimatedItems) { item in
                                         ScheduleItemCard(
@@ -428,14 +427,13 @@ struct ScheduleView: View {
                                     Spacer().frame(height: 128)
                                 }
                                 .padding(.top, 60)
-                                    .padding(.horizontal, 8)
-                                    .frame(maxWidth: .infinity)
+                                .padding(.horizontal, 16)
+                                .frame(maxWidth: .infinity)
                             }
                             .coordinateSpace(name: scrollCoordinateSpaceName)
                             .onPreferenceChange(ScheduleScrollTopPreferenceKey.self) { topY in
                                 handleScrollTopChange(topY)
                             }
-                            .simultaneousGesture(scheduleChromeDragGesture)
                             .refreshable {
                                 await performManualRefresh()
                             }
@@ -479,8 +477,14 @@ struct ScheduleView: View {
             await loadHomeworksForSelectedDate()
         }
     }
+    .onChange(of: externalRefreshRequest) { _ in
+        Task {
+            await performManualRefresh()
+        }
+    }
     .onAppear {
         guard !groupId.isEmpty else { return }
+        lastContentTopY = nil
         onScrollChromeChange(true, true)
         if examOnly {
             viewModel.loadSessionFromCache(groupId: groupId)
@@ -530,47 +534,28 @@ struct ScheduleView: View {
         .frame(height: 1)
     }
 
-    private func handleScrollTopChange(_ topY: CGFloat) {
-        guard topY.isFinite else { return }
-        let topChromeVisible = topY > 24
-        let bottomIslandVisible: Bool
-        if let lastContentTopY {
-            let delta = topY - lastContentTopY
-            if topY > 58 {
-                bottomIslandVisible = true
-            } else if delta < -2 {
-                bottomIslandVisible = false
-            } else if delta > 2 {
-                bottomIslandVisible = true
-            } else {
-                return
-            }
-        } else {
-            bottomIslandVisible = true
-        }
-        lastContentTopY = topY
-        onScrollChromeChange(topChromeVisible, bottomIslandVisible)
+    private var connectionErrorMessage: String {
+        "Ошибка подключения. Выключи VPN и нажми «Обновить» в островке."
     }
 
-    private var scheduleChromeDragGesture: some Gesture {
-        DragGesture(minimumDistance: 8, coordinateSpace: .local)
-            .onChanged { value in
-                let currentY = value.location.y
-                guard let lastDragY else {
-                    lastDragY = currentY
-                    return
-                }
-                let delta = currentY - lastDragY
-                self.lastDragY = currentY
-                if delta < -3 {
-                    onScrollChromeChange(false, false)
-                } else if delta > 3 {
-                    onScrollChromeChange(true, true)
-                }
-            }
-            .onEnded { _ in
-                lastDragY = nil
-            }
+    private var emptyScheduleMessage: String {
+        if examOnly {
+            return "Сессия пуста. Нажми «Обновить» в островке."
+        }
+
+        return "Нет пар на выбранную дату"
+    }
+
+    private func handleScrollTopChange(_ topY: CGFloat) {
+        guard topY.isFinite else { return }
+        if let lastContentTopY, abs(topY - lastContentTopY) < 1 {
+            return
+        }
+
+        lastContentTopY = topY
+        let topChromeVisible = topY > 42
+        let bottomIslandVisible = topY > 42
+        onScrollChromeChange(topChromeVisible, bottomIslandVisible)
     }
 
     private func performManualRefresh() async {
