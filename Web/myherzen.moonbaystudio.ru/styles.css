@@ -886,6 +886,42 @@ img {
   font-size: 20px;
 }
 
+.legal-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+}
+
+.legal-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.legal-table th,
+.legal-table td {
+  padding: 14px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.legal-table th {
+  color: #e8ecfb;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.legal-table td {
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.legal-table tr:last-child td {
+  border-bottom: 0;
+}
+
 .site-footer {
   margin-top: 40px;
   padding: 24px 0;

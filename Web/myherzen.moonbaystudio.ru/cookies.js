@@ -50,7 +50,7 @@
     banner.innerHTML =
       '<div class="cookie-banner-inner">' +
         '<div><h2>Мы используем cookie</h2>' +
-        '<p>Необходимые cookie помогают сайту работать, а аналитические и маркетинговые включаются только с вашего согласия.</p></div>' +
+        '<p>Необходимые cookie помогают сайту работать. Аналитика и маркетинг сейчас не подключены и могут использоваться только после обновления политики и вашего согласия.</p></div>' +
         '<div class="cookie-actions"></div>' +
       '</div>';
 
@@ -66,8 +66,8 @@
         '</div>' +
         '<div class="cookie-options">' +
           '<label class="cookie-option"><span><strong>Необходимые cookie</strong><p>Нужны для безопасности, навигации и сохранения выбранных настроек. Всегда активны.</p></span><input type="checkbox" checked disabled></label>' +
-          '<label class="cookie-option"><span><strong>Аналитика</strong><p>Помогает понимать, какие страницы полезны, и улучшать сайт.</p></span><input type="checkbox" data-cookie-input="analytics"></label>' +
-          '<label class="cookie-option"><span><strong>Маркетинг</strong><p>Используется для измерения эффективности кампаний и релевантных объявлений.</p></span><input type="checkbox" data-cookie-input="marketing"></label>' +
+          '<label class="cookie-option"><span><strong>Аналитика</strong><p>Сейчас аналитические скрипты не подключены. Этот выбор будет учитываться, если аналитика появится позже.</p></span><input type="checkbox" data-cookie-input="analytics"></label>' +
+          '<label class="cookie-option"><span><strong>Маркетинг</strong><p>Сейчас рекламные и маркетинговые трекеры не подключены. Этот выбор будет учитываться, если они появятся позже.</p></span><input type="checkbox" data-cookie-input="marketing"></label>' +
         '</div>' +
         '<div class="cookie-actions"></div>' +
       '</div>';
