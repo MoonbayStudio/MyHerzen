@@ -54,6 +54,7 @@
 
     messageEl.textContent = text;
     messageEl.className = "auth-message";
+    messageEl.hidden = !text;
 
     if (type === "error") {
       messageEl.classList.add("is-error");
@@ -397,7 +398,7 @@
       loggedInStateEl.hidden = false;
     }
 
-    setMessage("Профиль загружен.", "success");
+    setMessage("");
     updateNav();
     loadSettings();
   }
@@ -433,8 +434,6 @@
       renderLoggedOut(msg);
       return;
     }
-
-    setMessage("Проверяем сессию...");
 
     try {
       var user = await auth.fetchCurrentUser();

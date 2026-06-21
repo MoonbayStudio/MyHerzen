@@ -411,6 +411,10 @@ img {
   line-height: 1.6;
 }
 
+.auth-message:empty {
+  display: none;
+}
+
 .auth-message.is-error {
   color: var(--danger);
 }
