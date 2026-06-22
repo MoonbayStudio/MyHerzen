@@ -79,6 +79,7 @@ docker-data/
 Android/.gradle/
 Android/build/
 Android/app/build/
+Android/signin-assets/
 
 Android/local.properties
 
