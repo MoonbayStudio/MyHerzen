@@ -187,6 +187,28 @@ data class EmailConfirmRequest(val code: String)
 
 data class ContactEmailRequest(val email: String)
 
+data class SuccessResponse(val success: Boolean)
+
+data class SignupRequest(
+    val email: String,
+    val password: String,
+    @SerializedName("displayName") val displayName: String
+)
+
+data class SignupResponse(
+    val status: String,
+    val email: String
+)
+
+data class SignupVerifyRequest(
+    val email: String,
+    val code: String,
+    @SerializedName("deviceId") val deviceId: String?,
+    @SerializedName("deviceName") val deviceName: String?,
+    val platform: String = "android",
+    @SerializedName("appVersion") val appVersion: String?
+)
+
 data class AccountSession(
     val id: String,
     @SerializedName("device_id", alternate = ["deviceId"]) val deviceId: String?,

@@ -13,7 +13,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.input.ImeAction
+import ru.moonbaystudio.myherzen.R
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -37,6 +39,7 @@ fun LoginScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val isLoggedIn by viewModel.isLoggedIn.collectAsState(initial = false)
+    val isVerificationRequired by viewModel.isVerificationRequired.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -47,6 +50,8 @@ fun LoginScreen(
     var resetStep by remember { mutableStateOf(1) }
     var resetCode by remember { mutableStateOf("") }
     var resetNewPassword by remember { mutableStateOf("") }
+
+    var verificationCode by remember { mutableStateOf("") }
 
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
@@ -77,21 +82,60 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            if (isRegisterMode) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Имя") },
-                    modifier = Modifier.fillMaxWidth(),
-                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                    trailingIcon = if (name.isNotEmpty()) {
-                        { IconButton(onClick = { name = "" }) { Icon(Icons.Default.Clear, contentDescription = "Очистить") } }
-                    } else null,
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+            if (isVerificationRequired) {
+                Text(
+                    "Подтверждение регистрации",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-            }
+                Text(
+                    "Введите код, отправленный на ваш email",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = verificationCode,
+                    onValueChange = { verificationCode = it },
+                    label = { Text("Код подтверждения") },
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done)
+                )
+                Spacer(modifier = Modifier.height(24.dp))
+                Button(
+                    onClick = { viewModel.verifySignup(verificationCode) },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    enabled = !isLoading && verificationCode.isNotBlank(),
+                    shape = MaterialTheme.shapes.large
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp), color = MaterialTheme.colorScheme.onPrimary)
+                    } else {
+                        Text("Подтвердить")
+                    }
+                }
+                TextButton(onClick = { viewModel.resetStatus() }) {
+                    Text("Назад к регистрации")
+                }
+            } else {
+                if (isRegisterMode) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Имя") },
+                        modifier = Modifier.fillMaxWidth(),
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                        trailingIcon = if (name.isNotEmpty()) {
+                            { IconButton(onClick = { name = "" }) { Icon(Icons.Default.Clear, contentDescription = "Очистить") } }
+                        } else null,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
 
             OutlinedTextField(
                 value = email,
@@ -162,37 +206,53 @@ fun LoginScreen(
                 }
                 Spacer(modifier = Modifier.height(16.dp))
 
-                OutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            performGoogleSignIn(context, viewModel)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    enabled = !isLoading,
-                    shape = MaterialTheme.shapes.large
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(imageVector = Icons.Default.AccountCircle, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Продолжить через Google")
-                }
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                performGoogleSignIn(context, viewModel)
+                            }
+                        },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        enabled = !isLoading,
+                        shape = MaterialTheme.shapes.large,
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurface
+                        )
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_google_logo),
+                            contentDescription = null,
+                            tint = Color.Unspecified,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Google")
+                    }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Кнопка Sign in with Apple
-                Button(
-                    onClick = { performAppleSignIn(context) },
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    enabled = !isLoading,
-                    shape = MaterialTheme.shapes.large,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Black,
-                        contentColor = Color.White
-                    )
-                ) {
-                    Icon(imageVector = Icons.Default.AccountCircle, contentDescription = null, tint = Color.White)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Войти через Apple")
+                    // Кнопка Sign in with Apple
+                    Button(
+                        onClick = { performAppleSignIn(context) },
+                        modifier = Modifier.weight(1f).height(50.dp),
+                        enabled = !isLoading,
+                        shape = MaterialTheme.shapes.large,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.Black,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_apple_logo),
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Apple")
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))

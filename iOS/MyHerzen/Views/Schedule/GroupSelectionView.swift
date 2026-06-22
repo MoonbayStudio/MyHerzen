@@ -38,35 +38,50 @@ struct GroupSelectionView: View {
                 .padding(12)
                 .myherzenDefaultSurface(cornerRadius: 14, padding: 0)
 
-            if isLoading {
-                ProgressView("Загружаем группы")
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.top, 24)
-            } else {
-                List(filteredGroups) { group in
-                    Button {
-                        select(group)
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(group.name)
-                                    .font(.body.weight(.semibold))
-                                Text("ID \(group.id)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            Spacer()
-                            if selectedGroup?.id == group.id || viewModel.savedGroupId == group.id {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.accentColor)
+            Group {
+                if isLoading && institutes.isEmpty {
+                    VStack(spacing: 12) {
+                        ProgressView()
+                        Text("Загружаем группы")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                } else if filteredGroups.isEmpty {
+                    VStack(spacing: 8) {
+                        Text("Группы не найдены")
+                            .font(.headline)
+                        Text("Попробуй изменить поисковый запрос.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                } else {
+                    List(filteredGroups) { group in
+                        Button {
+                            select(group)
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    Text(group.name)
+                                        .font(.body.weight(.semibold))
+                                }
+                                Spacer()
+                                if selectedGroup?.id == group.id || viewModel.savedGroupId == group.id {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.accentColor)
+                                }
                             }
                         }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                    .listStyle(.plain)
                 }
-                .listStyle(.plain)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(.horizontal, 16)
         .padding(.top, 16)
         .background(ThemedBackground(theme: activeTheme).ignoresSafeArea())

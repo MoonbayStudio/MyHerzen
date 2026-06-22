@@ -29,6 +29,12 @@ class AuthViewModel @Inject constructor(
     private val _sessions = MutableStateFlow<List<AccountSession>>(emptyList())
     val sessions: StateFlow<List<AccountSession>> = _sessions.asStateFlow()
 
+    private val _isVerificationRequired = MutableStateFlow(false)
+    val isVerificationRequired: StateFlow<Boolean> = _isVerificationRequired.asStateFlow()
+
+    private val _pendingEmail = MutableStateFlow<String?>(null)
+    val pendingEmail: StateFlow<String?> = _pendingEmail.asStateFlow()
+
     val isLoggedIn = authRepository.isLoggedIn
 
     val currentUser: StateFlow<AppleUser?> = authRepository.currentUser
@@ -60,8 +66,27 @@ class AuthViewModel @Inject constructor(
             _isLoading.value = true
             _error.value = null
             val result = authRepository.register(name, email, password)
-            if (result.isFailure) {
+            if (result.isSuccess) {
+                _pendingEmail.value = email
+                _isVerificationRequired.value = true
+            } else {
                 _error.value = result.exceptionOrNull()?.message ?: "Registration failed"
+            }
+            _isLoading.value = false
+        }
+    }
+
+    fun verifySignup(code: String) {
+        val email = _pendingEmail.value ?: return
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            val result = authRepository.verifySignup(email, code)
+            if (result.isSuccess) {
+                _isVerificationRequired.value = false
+                _pendingEmail.value = null
+            } else {
+                _error.value = result.exceptionOrNull()?.message ?: "Verification failed"
             }
             _isLoading.value = false
         }
@@ -169,6 +194,8 @@ class AuthViewModel @Inject constructor(
     fun resetStatus() {
         _success.value = false
         _error.value = null
+        _isVerificationRequired.value = false
+        _pendingEmail.value = null
     }
 
     fun loadSessions() {

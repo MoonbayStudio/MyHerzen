@@ -2,6 +2,7 @@ import Foundation
 
 struct AssistantChatContextPayload: Encodable {
     let selectedGroupId: Int?
+    let selectedGroupName: String?
     let selectedDate: String?
 }
 
@@ -30,6 +31,7 @@ struct AssistantChatRequestPayload: Encodable {
     let context: AssistantChatContextPayload?
     let conversationId: String?
     let groupId: Int?
+    let groupName: String?
     let targetDate: String?
     let cachedSchedule: CachedSchedulePayload?
 }
@@ -51,6 +53,7 @@ final class AssistantAPIService {
         messages: [AssistantChatMessagePayload]? = nil,
         conversationId: String?,
         groupId: Int?,
+        groupName: String? = nil,
         targetDate: String?,
         cachedSchedule: CachedSchedulePayload?
     ) async throws -> AssistantChatResponsePayload {
@@ -58,9 +61,14 @@ final class AssistantAPIService {
             message: message,
             persona: persona.rawValue,
             messages: messages,
-            context: AssistantChatContextPayload(selectedGroupId: groupId, selectedDate: targetDate),
+            context: AssistantChatContextPayload(
+                selectedGroupId: groupId,
+                selectedGroupName: groupName,
+                selectedDate: targetDate
+            ),
             conversationId: conversationId,
             groupId: groupId,
+            groupName: groupName,
             targetDate: targetDate,
             cachedSchedule: cachedSchedule
         )

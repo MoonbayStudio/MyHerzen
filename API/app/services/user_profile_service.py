@@ -53,7 +53,8 @@ def build_user_response(db: Session, user: User) -> Dict[str, Any]:
     legacy_email = normalize_email(user.email)
     linked_providers = set()
 
-    if user.apple_sub:
+    # apple_sub is used as a general sub, so we only add "apple" if it doesn't have a prefix
+    if user.apple_sub and not user.apple_sub.startswith(("google:", "email:", "apple:")):
         linked_providers.add("apple")
 
     for provider_name in db.query(AuthProvider.provider).filter(

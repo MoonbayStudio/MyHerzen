@@ -20,13 +20,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import ru.moonbaystudio.myherzen.R
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.launch
 import ru.moonbaystudio.myherzen.ui.viewmodel.AuthViewModel
+import ru.moonbaystudio.myherzen.util.performAppleSignIn
 import ru.moonbaystudio.myherzen.util.performGoogleSignIn
 import ru.moonbaystudio.myherzen.ui.viewmodel.GroupSelectionViewModel
 import ru.moonbaystudio.myherzen.ui.viewmodel.OnboardingViewModel
@@ -158,18 +161,52 @@ fun OnboardingAuthStep(viewModel: AuthViewModel, onNext: () -> Unit) {
 
         Spacer(Modifier.height(48.dp))
 
-        Button(
-            onClick = {
-                scope.launch {
-                    performGoogleSignIn(context, viewModel)
-                }
-            },
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-            shape = RoundedCornerShape(16.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(imageVector = Icons.Default.AccountCircle, contentDescription = null)
-            Spacer(Modifier.width(12.dp))
-            Text("Войти через Google")
+            Button(
+                onClick = {
+                    scope.launch {
+                        performGoogleSignIn(context, viewModel)
+                    }
+                },
+                modifier = Modifier.weight(1f).height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    contentColor = MaterialTheme.colorScheme.onSurface
+                ),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_google_logo),
+                    contentDescription = null,
+                    tint = Color.Unspecified,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Google")
+            }
+
+            Button(
+                onClick = { performAppleSignIn(context) },
+                modifier = Modifier.weight(1f).height(56.dp),
+                shape = RoundedCornerShape(16.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Black,
+                    contentColor = Color.White
+                )
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_apple_logo),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Apple")
+            }
         }
 
         Spacer(Modifier.height(16.dp))

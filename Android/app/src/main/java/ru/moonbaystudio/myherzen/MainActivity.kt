@@ -146,15 +146,15 @@ fun AppNavigation(selectedGroupId: Int?, onboardingCompleted: Boolean?) {
         Screen.Menu
     )
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         NavHost(
             navController = navController,
             startDestination = startDestination,
             modifier = Modifier.fillMaxSize(),
-            enterTransition = { fadeIn(animationSpec = tween(400)) + slideInHorizontally(initialOffsetX = { it / 4 }, animationSpec = tween(400)) },
-            exitTransition = { fadeOut(animationSpec = tween(400)) + slideOutHorizontally(targetOffsetX = { -it / 4 }, animationSpec = tween(400)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(400)) + slideInHorizontally(initialOffsetX = { -it / 4 }, animationSpec = tween(400)) },
-            popExitTransition = { fadeOut(animationSpec = tween(400)) + slideOutHorizontally(targetOffsetX = { it / 4 }, animationSpec = tween(400)) }
+            enterTransition = { fadeIn(animationSpec = tween(300)) },
+            exitTransition = { fadeOut(animationSpec = tween(300)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(300)) },
+            popExitTransition = { fadeOut(animationSpec = tween(300)) }
         ) {
             composable("onboarding") {
                 OnboardingScreen(

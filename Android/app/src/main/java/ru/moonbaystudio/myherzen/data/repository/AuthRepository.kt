@@ -39,16 +39,24 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun register(name: String, email: String, password: String): Result<Unit> {
-        val deviceIdValue = userPreferences.deviceId.first()
-        val request = RegisterRequest(
-            name = name,
+        val request = SignupRequest(
             email = email,
             password = password,
+            displayName = name
+        )
+        return safeApiCall { apiService.signup(request) }.toResult().map { Unit }
+    }
+
+    suspend fun verifySignup(email: String, code: String): Result<Unit> {
+        val deviceIdValue = userPreferences.deviceId.first()
+        val request = SignupVerifyRequest(
+            email = email,
+            code = code,
             deviceId = deviceIdValue,
             deviceName = android.os.Build.MODEL,
             appVersion = "1.0"
         )
-        return safeApiCall { apiService.register(request) }.toResult().map { body ->
+        return safeApiCall { apiService.signupVerify(request) }.toResult().map { body ->
             userPreferences.saveAuthToken(body.token)
             _currentUser.value = body.user
             Unit

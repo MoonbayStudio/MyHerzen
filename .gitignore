@@ -9,6 +9,7 @@
 # Editors
 # =========================
 .vscode/
+.local/
 
 .idea/
 *.iml

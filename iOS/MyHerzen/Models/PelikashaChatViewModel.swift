@@ -17,6 +17,13 @@ final class PelikashaChatViewModel: ObservableObject {
         let cachedPayload: CachedSchedulePayload?
     }
 
+    private struct LocalContextData {
+        let scheduleItems: [ScheduleItem]
+        let exams: [ScheduleItem]
+        let homeworks: [Homework]
+        let cachedSchedule: CachedSchedulePayload?
+    }
+
     @Published var messages: [PelikashaMessage] = []
     @Published var inputText = ""
     @Published var isLoading = false
@@ -130,36 +137,260 @@ final class PelikashaChatViewModel: ObservableObject {
         let targetDateValue = selectedDateProvider() ?? Date()
         let targetDate = Self.dateString(targetDateValue)
         let groupId = Self.selectedGroupId
+        let groupName = Self.selectedGroupName
+        let groupContext = Self.selectedGroupContext(id: groupId, name: groupName)
+        let userMessage = promptDialog.messages.last(where: { $0.role == "user" })?.text ?? ""
+        let intent = ChatIntentDetector.detectIntent(userMessage)
         currentTask = Task { [weak self] in
             do {
-                let scheduleContext = await Self.scheduleContext(groupId: groupId, date: targetDateValue)
-                let promptMessages = PelikashaPromptBuilder.buildMessages(
-                    personaRawValue: persona.rawValue,
-                    dialog: promptDialog,
-                    scheduleContext: scheduleContext.text
+                let localData = await Self.loadLocalContext(
+                    intent: intent,
+                    groupId: groupId,
+                    date: targetDateValue
                 )
-                let contextualMessage = PelikashaPromptBuilder.legacyMessage(from: promptMessages)
-                let response = try await AssistantAPIService.shared.sendChatMessage(
-                    message: contextualMessage,
+                let orchestrationContext = ChatOrchestrationContext(
+                    intent: intent,
+                    personaRawValue: persona.rawValue,
+                    userMessage: userMessage,
+                    group: groupContext,
+                    targetDate: targetDateValue,
+                    scheduleItems: localData.scheduleItems.map(Self.aiScheduleLesson),
+                    exams: localData.exams.map(Self.aiScheduleLesson),
+                    homeworks: localData.homeworks.map(Self.aiHomework),
+                    dialog: promptDialog
+                )
+
+                Self.debugLog("intent=\(intent), localSchedule=\(localData.scheduleItems.count), exams=\(localData.exams.count), homeworks=\(localData.homeworks.count)")
+
+                if let localAnswer = LocalAnswerEngine.answer(for: orchestrationContext) {
+                    guard !Task.isCancelled else { return }
+                    Self.debugLog("localAnswer=true")
+                    self?.messages.append(PelikashaMessage(role: .assistant, text: localAnswer, persona: persona))
+                    self?.persistCurrentDialog()
+                    self?.summarizeCurrentDialogIfNeeded()
+                    self?.isLoading = false
+                    self?.currentTask = nil
+                    return
+                }
+
+                let packets = ContextSelector.packets(for: orchestrationContext)
+                let budget = ContextBudgeter.buildPrompt(
+                    packets: packets,
+                    emergencyUserMessage: userMessage,
+                    personaRawValue: persona.rawValue
+                )
+                Self.debugLog(
+                    "localAnswer=false, packets=\(budget.packets.map(\.name)), promptChars=\(budget.prompt.count), emergency=\(budget.usedEmergencyPrompt)"
+                )
+
+                let response = try await Self.sendAIRequest(
+                    prompt: budget.prompt,
                     persona: persona,
-                    messages: promptMessages,
                     conversationId: self?.currentDialogID.uuidString,
                     groupId: groupId,
+                    groupName: groupName,
                     targetDate: targetDate,
-                    cachedSchedule: scheduleContext.cachedPayload
+                    cachedSchedule: localData.cachedSchedule
                 )
+                let validatedReply = try await Self.validatedReply(
+                    response.reply,
+                    userMessage: userMessage,
+                    persona: persona,
+                    conversationId: self?.currentDialogID.uuidString,
+                    groupId: groupId,
+                    groupName: groupName,
+                    targetDate: targetDate,
+                    groupContext: groupContext
+                )
+
                 guard !Task.isCancelled else { return }
                 self?.remaining = response.remaining
-                self?.messages.append(PelikashaMessage(role: .assistant, text: response.reply, persona: persona))
+                self?.messages.append(PelikashaMessage(role: .assistant, text: validatedReply, persona: persona))
                 self?.persistCurrentDialog()
                 self?.summarizeCurrentDialogIfNeeded()
             } catch {
                 guard !Task.isCancelled else { return }
-                self?.appendLocalSystemMessage(Self.errorMessage(for: error))
+                Self.debugLog("error=\(String(describing: error))")
+                if let retryReply = try? await Self.retryEmergencyAfterError(
+                    error,
+                    userMessage: userMessage,
+                    persona: persona,
+                    conversationId: self?.currentDialogID.uuidString,
+                    groupId: groupId,
+                    groupName: groupName,
+                    targetDate: targetDate,
+                    groupContext: groupContext
+                ) {
+                    self?.messages.append(PelikashaMessage(role: .assistant, text: retryReply, persona: persona))
+                    self?.persistCurrentDialog()
+                    self?.summarizeCurrentDialogIfNeeded()
+                } else {
+                    self?.appendLocalSystemMessage(Self.errorMessage(for: error))
+                }
             }
             self?.isLoading = false
             self?.currentTask = nil
         }
+    }
+
+    private static func sendAIRequest(
+        prompt: String,
+        persona: AssistantPersona,
+        conversationId: String?,
+        groupId: Int?,
+        groupName: String?,
+        targetDate: String,
+        cachedSchedule: CachedSchedulePayload?
+    ) async throws -> AssistantChatResponsePayload {
+        try await AssistantAPIService.shared.sendChatMessage(
+            message: prompt,
+            persona: persona,
+            messages: [AssistantChatMessagePayload(role: "user", content: prompt)],
+            conversationId: conversationId,
+            groupId: groupId,
+            groupName: groupName,
+            targetDate: targetDate,
+            cachedSchedule: cachedSchedule
+        )
+    }
+
+    private static func validatedReply(
+        _ reply: String,
+        userMessage: String,
+        persona: AssistantPersona,
+        conversationId: String?,
+        groupId: Int?,
+        groupName: String?,
+        targetDate: String,
+        groupContext: UserGroupContext?
+    ) async throws -> String {
+        let validation = AIResponseValidator.validate(reply, userMessage: userMessage, group: groupContext)
+        debugLog("responseValidation=\(validation.isValid), reason=\(validation.reason ?? "ok")")
+        guard !validation.isValid else { return reply }
+
+        let emergency = ContextSelector.emergencyPrompt(userMessage: userMessage, personaRawValue: persona.rawValue)
+        let retry = try await sendAIRequest(
+            prompt: String(emergency.prefix(1_800)),
+            persona: persona,
+            conversationId: conversationId,
+            groupId: groupId,
+            groupName: groupName,
+            targetDate: targetDate,
+            cachedSchedule: nil
+        )
+        let retryValidation = AIResponseValidator.validate(retry.reply, userMessage: userMessage, group: groupContext)
+        debugLog("responseValidationRetry=\(retryValidation.isValid), reason=\(retryValidation.reason ?? "ok")")
+        return retryValidation.isValid ? retry.reply : "Я сбилась с ответа. Попробуй спросить ещё раз чуть короче."
+    }
+
+    private static func retryEmergencyAfterError(
+        _ error: Error,
+        userMessage: String,
+        persona: AssistantPersona,
+        conversationId: String?,
+        groupId: Int?,
+        groupName: String?,
+        targetDate: String,
+        groupContext: UserGroupContext?
+    ) async throws -> String? {
+        guard isPromptTooLongError(error) else { return nil }
+        let emergency = String(ContextSelector.emergencyPrompt(userMessage: userMessage, personaRawValue: persona.rawValue).prefix(1_800))
+        debugLog("promptTooLong=true, retryEmergency=true, promptChars=\(emergency.count)")
+        let response = try await sendAIRequest(
+            prompt: emergency,
+            persona: persona,
+            conversationId: conversationId,
+            groupId: groupId,
+            groupName: groupName,
+            targetDate: targetDate,
+            cachedSchedule: nil
+        )
+        let validation = AIResponseValidator.validate(response.reply, userMessage: userMessage, group: groupContext)
+        return validation.isValid ? response.reply : "Я сократила контекст, но всё равно сбилась с ответа. Попробуй спросить ещё раз чуть короче."
+    }
+
+    private static func loadLocalContext(intent: ChatIntent, groupId: Int?, date: Date) async -> LocalContextData {
+        guard let groupId else {
+            return LocalContextData(scheduleItems: [], exams: [], homeworks: [], cachedSchedule: nil)
+        }
+
+        let groupIdString = String(groupId)
+        switch intent {
+        case .currentLesson, .todaySchedule:
+            let items = await APIService.shared.fetchSchedule(for: groupIdString, date: date)
+            return LocalContextData(
+                scheduleItems: items,
+                exams: [],
+                homeworks: [],
+                cachedSchedule: items.isEmpty ? nil : PelikashaScheduleContextBuilder.cachedSchedule(from: items, date: date)
+            )
+        case .tomorrowSchedule:
+            let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: date) ?? date
+            let items = await APIService.shared.fetchSchedule(for: groupIdString, date: tomorrow)
+            return LocalContextData(
+                scheduleItems: items,
+                exams: [],
+                homeworks: [],
+                cachedSchedule: items.isEmpty ? nil : PelikashaScheduleContextBuilder.cachedSchedule(from: items, date: tomorrow)
+            )
+        case .exams:
+            let exams = await APIService.shared.fetchSchedule(for: groupIdString, date: date, examOnly: true)
+            return LocalContextData(scheduleItems: [], exams: exams, homeworks: [], cachedSchedule: nil)
+        case .homework:
+            let homeworks = (try? await APIService.shared.fetchGroupHomeworks(groupId: groupId, date: dateString(date))) ?? []
+            return LocalContextData(scheduleItems: [], exams: [], homeworks: homeworks, cachedSchedule: nil)
+        case .smallTalk, .groupInfo, .unknown:
+            return LocalContextData(scheduleItems: [], exams: [], homeworks: [], cachedSchedule: nil)
+        }
+    }
+
+    private static func selectedGroupContext(id: Int?, name: String?) -> UserGroupContext? {
+        guard let id else { return nil }
+        return UserGroupContext(id: id, name: name, facultyName: nil, programName: nil)
+    }
+
+    private static func aiScheduleLesson(from item: ScheduleItem) -> AIScheduleLessonContext {
+        AIScheduleLessonContext(
+            startISO: item.sortDateISO,
+            endISO: item.endDateISO,
+            time: item.time,
+            title: item.title,
+            teacher: item.teacher,
+            lessonType: item.lessonType,
+            address: item.address,
+            subgroup: item.subgroup,
+            period: item.period,
+            room: item.room,
+            classURL: item.classURL
+        )
+    }
+
+    private static func aiHomework(from homework: Homework) -> AIHomeworkContext {
+        AIHomeworkContext(
+            lessonDate: homework.lessonDate,
+            lessonTime: homework.lessonTime,
+            subject: homework.subject,
+            teacher: homework.teacher,
+            room: homework.room,
+            text: homework.text
+        )
+    }
+
+    private static func isPromptTooLongError(_ error: Error) -> Bool {
+        if case APIServiceError.httpStatusWithBody(let statusCode, let body) = error {
+            let body = body?.lowercased() ?? ""
+            return statusCode == 400 && (body.contains("слишком длин") || body.contains("too long"))
+        }
+        if case APIServiceError.httpStatus(let statusCode) = error {
+            return statusCode == 400
+        }
+        return false
+    }
+
+    private static func debugLog(_ message: String) {
+#if DEBUG
+        print("[PelikashaOrchestrator] \(message)")
+#endif
     }
 
     @discardableResult
@@ -266,14 +497,31 @@ final class PelikashaChatViewModel: ObservableObject {
     }
 
     private static var selectedGroupId: Int? {
-        let value = UserDefaults.standard.string(forKey: "selectedGroupId") ?? ""
+        let sharedValue = UserDefaults(suiteName: "group.myherzen.shared")?.string(forKey: "selectedGroupId")
+        let value = sharedValue ?? UserDefaults.standard.string(forKey: "selectedGroupId") ?? ""
         return Int(value)
     }
 
-    private static func scheduleContext(groupId: Int?, date: Date) async -> ScheduleContext {
+    private static var selectedGroupName: String? {
+        let sharedValue = UserDefaults(suiteName: "group.myherzen.shared")?.string(forKey: "selectedGroupName")
+        let value = sharedValue ?? UserDefaults.standard.string(forKey: "selectedGroupName")
+        let trimmed = value?.myherzenTrimmed ?? ""
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func scheduleContext(groupId: Int?, groupName: String?, date: Date) async -> ScheduleContext {
+        let groupDescription: String
+        if let groupName, !groupName.myherzenTrimmed.isEmpty {
+            groupDescription = groupName
+        } else if let groupId {
+            groupDescription = "группа с внутренним ID \(groupId)"
+        } else {
+            groupDescription = "не выбрана"
+        }
+
         guard let groupId else {
             return ScheduleContext(
-                text: "Группа пользователя не выбрана, поэтому точное расписание пар недоступно.",
+                text: "Выбранная группа пользователя: \(groupDescription). Точное расписание пар недоступно, потому что группа не выбрана.",
                 cachedPayload: nil
             )
         }
@@ -284,7 +532,11 @@ final class PelikashaChatViewModel: ObservableObject {
 
         guard !items.isEmpty else {
             return ScheduleContext(
-                text: "Группа: \(groupIdString). Дата: \(readableDate). В локальном расписании на эту дату пары не найдены.",
+                text: """
+                Выбранная группа пользователя: \(groupDescription).
+                Внутренний ID группы: \(groupIdString). Не называй его пользователю как название группы, если пользователь прямо не просит ID.
+                Дата: \(readableDate). В локальном расписании на эту дату пары не найдены.
+                """,
                 cachedPayload: nil
             )
         }
@@ -310,7 +562,9 @@ final class PelikashaChatViewModel: ObservableObject {
 
         return ScheduleContext(
             text: """
-            Группа: \(groupIdString). Дата: \(readableDate).
+            Выбранная группа пользователя: \(groupDescription).
+            Внутренний ID группы: \(groupIdString). Не называй его пользователю как название группы, если пользователь прямо не просит ID.
+            Дата: \(readableDate).
             Пары:
             \(lines.joined(separator: "\n"))
             """,
@@ -335,12 +589,34 @@ final class PelikashaChatViewModel: ObservableObject {
     }
 
     private static func errorMessage(for error: Error) -> String {
-        if let apiError = error as? APIServiceError {
-            return apiError.localizedDescription
+        if isPromptTooLongError(error) {
+            return "Сообщение получилось слишком длинным для текущего тарифа. Я сократила контекст - попробуй ещё раз."
+        }
+        if case APIServiceError.httpStatus(let statusCode) = error {
+            return errorMessage(forHTTPStatus: statusCode)
+        }
+        if case APIServiceError.httpStatusWithBody(let statusCode, _) = error {
+            return errorMessage(forHTTPStatus: statusCode)
         }
         if let urlError = error as? URLError, urlError.code != .cancelled {
+            if urlError.code == .timedOut {
+                return "Сервер долго не отвечает. Попробуй ещё раз."
+            }
             return "Не удалось подключиться к AI-сервису. Проверь сеть и попробуй ещё раз."
         }
         return "Не удалось получить ответ. Попробуй ещё раз."
+    }
+
+    private static func errorMessage(forHTTPStatus statusCode: Int) -> String {
+        switch statusCode {
+        case 400:
+            return "Не получилось обработать запрос. Я сократила контекст - попробуй ещё раз."
+        case 401, 403:
+            return "Похоже, есть проблема с доступом к AI."
+        case 500...599:
+            return "AI-сервис временно недоступен."
+        default:
+            return "Не удалось получить ответ. Попробуй ещё раз."
+        }
     }
 }

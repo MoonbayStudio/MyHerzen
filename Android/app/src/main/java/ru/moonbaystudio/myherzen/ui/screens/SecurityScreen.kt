@@ -29,6 +29,7 @@ import ru.moonbaystudio.myherzen.ui.components.CapsuleHeader
 import ru.moonbaystudio.myherzen.ui.viewmodel.AuthViewModel
 import ru.moonbaystudio.myherzen.util.Constants
 import ru.moonbaystudio.myherzen.util.findActivity
+import ru.moonbaystudio.myherzen.util.performAppleSignIn
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,12 +69,17 @@ fun SecurityScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Привязки", style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(bottom = 8.dp))
                 
-                // Apple Indicator
+                // Apple Link
                 val isAppleLinked = currentUser?.linkedProviders?.contains("apple") == true
                 ListItem(
                     headlineContent = { Text("Apple ID") },
                     leadingContent = { Icon(Icons.Default.AccountCircle, contentDescription = null, tint = if (isAppleLinked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant) },
-                    supportingContent = { Text(if (isAppleLinked) "Привязан" else "Не привязан") }
+                    supportingContent = { Text(if (isAppleLinked) "Привязан" else "Не привязан") },
+                    trailingContent = {
+                        if (!isAppleLinked) {
+                            TextButton(onClick = { performAppleSignIn(context) }) { Text("Привязать") }
+                        }
+                    }
                 )
 
                 // Google Link
