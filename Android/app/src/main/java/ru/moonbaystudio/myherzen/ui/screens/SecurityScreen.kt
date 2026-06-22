@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -20,12 +21,14 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
 import ru.moonbaystudio.myherzen.ui.components.ActionCapsule
 import ru.moonbaystudio.myherzen.ui.components.CapsuleHeader
 import ru.moonbaystudio.myherzen.ui.viewmodel.AuthViewModel
+import ru.moonbaystudio.myherzen.util.Constants
+import ru.moonbaystudio.myherzen.util.findActivity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,7 +46,7 @@ fun SecurityScreen(
             CapsuleHeader(
                 title = "Безопасность",
                 navigationIcon = {
-                    ActionCapsule(icon = Icons.Default.ArrowBack, onClick = onBack)
+                    ActionCapsule(icon = Icons.AutoMirrored.Filled.ArrowBack, onClick = onBack)
                 }
             )
         }
@@ -101,11 +104,9 @@ fun SecurityScreen(
 }
 
 private suspend fun handleGoogleLink(context: Context, viewModel: AuthViewModel) {
-    val credentialManager = CredentialManager.create(context)
-    val googleIdOption = GetGoogleIdOption.Builder()
-        .setFilterByAuthorizedAccounts(false)
-        .setServerClientId("295307918338-v06h8kfncsi65plqte80laqe7rqj4vt4.apps.googleusercontent.com")
-        .setAutoSelectEnabled(false)
+    val activity = context.findActivity() ?: return
+    val credentialManager = CredentialManager.create(activity)
+    val googleIdOption = GetSignInWithGoogleOption.Builder(Constants.GOOGLE_WEB_CLIENT_ID)
         .build()
 
     val request = GetCredentialRequest.Builder()
@@ -113,13 +114,13 @@ private suspend fun handleGoogleLink(context: Context, viewModel: AuthViewModel)
         .build()
 
     try {
-        val result = credentialManager.getCredential(context, request)
+        val result = credentialManager.getCredential(activity, request)
         val credential = result.credential
         if (credential is GoogleIdTokenCredential) {
             viewModel.linkGoogle(credential.idToken)
         }
     } catch (e: GetCredentialException) {
-        // Log error
+        android.util.Log.e("SecurityScreen", "Google link failed: ${e.message}", e)
     }
 }
 

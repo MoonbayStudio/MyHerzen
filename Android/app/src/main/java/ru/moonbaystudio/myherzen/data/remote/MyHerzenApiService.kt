@@ -9,6 +9,9 @@ interface MyHerzenApiService {
     @POST("auth/login")
     suspend fun login(@Body request: PasswordLoginRequest): Response<AppleSignInResponse>
 
+    @POST("auth/register")
+    suspend fun register(@Body request: RegisterRequest): Response<AppleSignInResponse>
+
     @GET("me")
     suspend fun getCurrentUser(): Response<AppleUser>
 

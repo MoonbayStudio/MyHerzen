@@ -3,6 +3,7 @@ fastapi
 uvicorn[standard]
 requests
 google-auth
+python-multipart
 python-jose
 cryptography
 pydantic

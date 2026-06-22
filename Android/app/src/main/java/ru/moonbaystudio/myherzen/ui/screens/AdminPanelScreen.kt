@@ -1,6 +1,5 @@
 package ru.moonbaystudio.myherzen.ui.screens
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -8,6 +7,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,131 +18,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import ru.moonbaystudio.myherzen.data.remote.dto.*
-import ru.moonbaystudio.myherzen.data.repository.AuthRepository
-import ru.moonbaystudio.myherzen.ui.components.CapsuleHeader
-import ru.moonbaystudio.myherzen.ui.components.UserBadgeRow
-import javax.inject.Inject
-
-@HiltViewModel
-class AdminViewModel @Inject constructor(
-    private val authRepository: AuthRepository
-) : ViewModel() {
-    private val _users = MutableStateFlow<List<AdminUserDto>>(emptyList())
-    val users: StateFlow<List<AdminUserDto>> = _users.asStateFlow()
-
-    private val _requests = MutableStateFlow<List<AdminRoleRequestDto>>(emptyList())
-    val requests: StateFlow<List<AdminRoleRequestDto>> = _requests.asStateFlow()
-
-    private val _badges = MutableStateFlow<List<BadgeDto>>(emptyList())
-    val badges: StateFlow<List<BadgeDto>> = _badges.asStateFlow()
-
-    private val _settings = MutableStateFlow<List<AdminRuntimeSetting>>(emptyList())
-    val settings: StateFlow<List<AdminRuntimeSetting>> = _settings.asStateFlow()
-
-    private val _notices = MutableStateFlow<List<SystemNotice>>(emptyList())
-    val notices: StateFlow<List<SystemNotice>> = _notices.asStateFlow()
-
-    private val _userSessions = MutableStateFlow<List<AccountSession>>(emptyList())
-    val userSessions: StateFlow<List<AccountSession>> = _userSessions.asStateFlow()
-
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
-
-    private val _errorMessage = MutableStateFlow<String?>(null)
-    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
-
-    fun loadAllData() {
-        viewModelScope.launch {
-            _isLoading.value = true
-            _errorMessage.value = null
-            try {
-                _users.value = authRepository.getAdminUsers()
-                _requests.value = authRepository.getAdminRoleRequests("pending")
-                _badges.value = authRepository.getAdminBadges()
-                _settings.value = authRepository.getAdminSettings()
-                _notices.value = authRepository.getAdminSystemNotices()
-            } catch (e: Exception) {
-                _errorMessage.value = "Ошибка загрузки: ${e.message}"
-            }
-            _isLoading.value = false
-        }
-    }
-
-    fun approveRequest(requestId: Int) {
-        viewModelScope.launch {
-            authRepository.approveRoleRequest(requestId).onSuccess { loadAllData() }
-        }
-    }
-
-    fun rejectRequest(requestId: Int) {
-        viewModelScope.launch {
-            authRepository.rejectRoleRequest(requestId).onSuccess { loadAllData() }
-        }
-    }
-
-    fun setRole(userId: String, role: String, enabled: Boolean) {
-        viewModelScope.launch {
-            val result = if (enabled) authRepository.grantRole(userId, role) else authRepository.revokeRole(userId, role)
-            result.onSuccess { loadAllData() }
-        }
-    }
-
-    fun setBadge(userId: String, badgeCode: String, enabled: Boolean, note: String?) {
-        viewModelScope.launch {
-            val result = if (enabled) authRepository.grantBadge(userId, badgeCode, note) else authRepository.revokeBadge(userId, badgeCode)
-            result.onSuccess { loadAllData() }
-        }
-    }
-
-    fun updateSetting(key: String, value: Any) {
-        viewModelScope.launch {
-            authRepository.updateAdminSetting(key, value).onSuccess { loadAllData() }
-        }
-    }
-
-    fun deleteNotice(id: Int) {
-        viewModelScope.launch {
-            authRepository.deleteAdminSystemNotice(id).onSuccess { loadAllData() }
-        }
-    }
-
-    fun toggleNotice(id: Int, active: Boolean) {
-        viewModelScope.launch {
-            val result = if (active) authRepository.activateSystemNotice(id) else authRepository.deactivateSystemNotice(id)
-            result.onSuccess { loadAllData() }
-        }
-    }
-
-    fun loadUserSessions(userId: String) {
-        viewModelScope.launch {
-            _userSessions.value = authRepository.getAdminUserSessions(userId)
-        }
-    }
-
-    fun revokeUserSession(userId: String, sessionId: String) {
-        viewModelScope.launch {
-            authRepository.revokeAdminSession(sessionId).onSuccess { loadUserSessions(userId) }
-        }
-    }
-
-    fun createNotice(request: SystemNoticeMutationRequest) {
-        viewModelScope.launch {
-            authRepository.createAdminSystemNotice(request).onSuccess { loadAllData() }
-        }
-    }
-}
+import ru.moonbaystudio.myherzen.data.remote.dto.AccountSession
+import ru.moonbaystudio.myherzen.data.remote.dto.AdminRoleRequestDto
+import ru.moonbaystudio.myherzen.data.remote.dto.AdminRuntimeSetting
+import ru.moonbaystudio.myherzen.data.remote.dto.AdminUserDto
+import ru.moonbaystudio.myherzen.data.remote.dto.BadgeDto
+import ru.moonbaystudio.myherzen.data.remote.dto.SystemNotice
+import ru.moonbaystudio.myherzen.data.remote.dto.SystemNoticeMutationRequest
+import ru.moonbaystudio.myherzen.ui.viewmodel.AdminViewModel
 
 enum class AdminTab { USERS, REQUESTS, SETTINGS, NOTICES }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminPanelScreen(
     onBack: () -> Unit,
@@ -151,6 +38,8 @@ fun AdminPanelScreen(
     val requests by viewModel.requests.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val notices by viewModel.notices.collectAsState()
+    val badges by viewModel.badges.collectAsState()
+    val userSessions by viewModel.userSessions.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.errorMessage.collectAsState()
 
@@ -176,8 +65,8 @@ fun AdminPanelScreen(
     if (userToEdit != null) {
         UserEditorDialog(
             user = userToEdit!!,
-            availableBadges = viewModel.badges.collectAsState().value,
-            sessions = viewModel.userSessions.collectAsState().value,
+            availableBadges = badges,
+            sessions = userSessions,
             onDismiss = { userToEdit = null },
             onRoleToggle = { role, enabled -> viewModel.setRole(userToEdit!!.id, role, enabled) },
             onBadgeToggle = { code, enabled, note -> viewModel.setBadge(userToEdit!!.id, code, enabled, note) },
@@ -188,7 +77,7 @@ fun AdminPanelScreen(
 
     Scaffold(
         topBar = {
-            CapsuleHeader(
+            ru.moonbaystudio.myherzen.ui.components.CapsuleHeader(
                 title = "Админка",
                 navigationIcon = {
                     Surface(
@@ -198,13 +87,13 @@ fun AdminPanelScreen(
                         modifier = Modifier.size(40.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.loadAllData() }, enabled = !isLoading) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
+                        Icon(imageVector = Icons.Default.Refresh, contentDescription = "Refresh")
                     }
                 }
             )
@@ -216,7 +105,7 @@ fun AdminPanelScreen(
                 edgePadding = 16.dp,
                 containerColor = Color.Transparent
             ) {
-                AdminTab.values().forEach { tab ->
+                AdminTab.entries.forEach { tab ->
                     val title = when(tab) {
                         AdminTab.USERS -> "Юзеры"
                         AdminTab.REQUESTS -> "Заявки (${requests.size})"
@@ -237,7 +126,7 @@ fun AdminPanelScreen(
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
+                    Icon(imageVector = Icons.Default.Add, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text("Создать уведомление")
                 }
@@ -249,7 +138,7 @@ fun AdminPanelScreen(
                     onValueChange = { searchText = it },
                     modifier = Modifier.fillMaxWidth().padding(16.dp),
                     placeholder = { Text("Поиск по имени или email") },
-                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    leadingIcon = { Icon(imageVector = Icons.Default.Search, contentDescription = null) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp)
                 )
@@ -270,26 +159,34 @@ fun AdminPanelScreen(
                     LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 100.dp)) {
                         when (selectedTab) {
                             AdminTab.USERS -> {
-                                items(filteredUsers) { user ->
+                                items(items = filteredUsers) { user ->
                                     UserListItem(user = user, onClick = { userToEdit = user })
                                 }
                             }
                             AdminTab.REQUESTS -> {
-                                items(requests) { request ->
-                                    RequestListItem(request = request, viewModel = viewModel)
+                                items(items = requests) { request ->
+                                    RequestListItem(
+                                        request = request,
+                                        onApprove = { viewModel.approveRequest(request.id) },
+                                        onReject = { viewModel.rejectRequest(request.id) }
+                                    )
                                 }
                                 if (requests.isEmpty()) {
                                     item { EmptyState("Нет активных заявок") }
                                 }
                             }
                             AdminTab.SETTINGS -> {
-                                items(settings) { setting ->
+                                items(items = settings) { setting ->
                                     SettingItem(setting = setting, onUpdate = { viewModel.updateSetting(setting.key, it) })
                                 }
                             }
                             AdminTab.NOTICES -> {
-                                items(notices) { notice ->
-                                    NoticeItem(notice = notice, viewModel = viewModel)
+                                items(items = notices) { notice ->
+                                    NoticeItem(
+                                        notice = notice,
+                                        onToggle = { viewModel.toggleNotice(notice.id, it) },
+                                        onDelete = { viewModel.deleteNotice(notice.id) }
+                                    )
                                 }
                                 if (notices.isEmpty()) {
                                     item { EmptyState("Уведомлений нет") }
@@ -304,6 +201,13 @@ fun AdminPanelScreen(
 }
 
 @Composable
+fun EmptyState(text: String) {
+    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+        Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
 fun UserListItem(user: AdminUserDto, onClick: () -> Unit) {
     ListItem(
         headlineContent = {
@@ -311,32 +215,32 @@ fun UserListItem(user: AdminUserDto, onClick: () -> Unit) {
                 Text(user.name ?: "Без имени", fontWeight = FontWeight.Bold)
                 if (user.badges.isNotEmpty()) {
                     Spacer(Modifier.width(8.dp))
-                    UserBadgeRow(badges = user.badges)
+                    ru.moonbaystudio.myherzen.ui.components.UserBadgeRow(badges = user.badges)
                 }
             }
         },
         supportingContent = { Text("${user.email ?: "no email"} • ${user.tier.uppercase()}") },
         leadingContent = {
             val icon = if (user.roles.any { it.type == "admin" }) Icons.Default.Star else Icons.Default.Person
-            Icon(icon, contentDescription = null, tint = if (icon == Icons.Default.Star) Color(0xFFFFD700) else MaterialTheme.colorScheme.primary)
+            Icon(imageVector = icon, contentDescription = null, tint = if (icon == Icons.Default.Star) Color(0xFFFFD700) else MaterialTheme.colorScheme.primary)
         },
-        trailingContent = { Icon(Icons.Default.KeyboardArrowRight, contentDescription = null) },
+        trailingContent = { Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
         modifier = Modifier.clickable(onClick = onClick)
     )
 }
 
 @Composable
-fun RequestListItem(request: AdminRoleRequestDto, viewModel: AdminViewModel) {
+fun RequestListItem(request: AdminRoleRequestDto, onApprove: () -> Unit, onReject: () -> Unit) {
     ListItem(
         headlineContent = { Text(request.userEmail ?: "ID: ${request.userId}") },
         supportingContent = { Text("Хочет роль: ${request.roleType}\n${request.createdAt}") },
         trailingContent = {
             Row {
-                IconButton(onClick = { viewModel.approveRequest(request.id) }) {
-                    Icon(Icons.Default.Check, contentDescription = "Approve", tint = Color.Green)
+                IconButton(onClick = onApprove) {
+                    Icon(imageVector = Icons.Default.Check, contentDescription = "Approve", tint = Color.Green)
                 }
-                IconButton(onClick = { viewModel.rejectRequest(request.id) }) {
-                    Icon(Icons.Default.Close, contentDescription = "Reject", tint = Color.Red)
+                IconButton(onClick = onReject) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Reject", tint = Color.Red)
                 }
             }
         }
@@ -349,14 +253,12 @@ fun SettingItem(setting: AdminRuntimeSetting, onUpdate: (Any) -> Unit) {
         headlineContent = { Text(setting.key, fontWeight = FontWeight.Medium) },
         supportingContent = { Text(setting.value.toString()) },
         trailingContent = {
-            when (setting.value) {
-                is Boolean -> {
-                    Switch(checked = setting.value, onCheckedChange = { onUpdate(it) })
-                }
-                else -> {
-                    IconButton(onClick = { /* TODO: Dialog for text/int update */ }) {
-                        Icon(Icons.Default.Edit, contentDescription = null)
-                    }
+            val valueAny = setting.value
+            if (valueAny is Boolean) {
+                Switch(checked = valueAny, onCheckedChange = { onUpdate(it) })
+            } else {
+                IconButton(onClick = { /* TODO */ }) {
+                    Icon(imageVector = Icons.Default.Edit, contentDescription = null)
                 }
             }
         }
@@ -364,15 +266,15 @@ fun SettingItem(setting: AdminRuntimeSetting, onUpdate: (Any) -> Unit) {
 }
 
 @Composable
-fun NoticeItem(notice: SystemNotice, viewModel: AdminViewModel) {
+fun NoticeItem(notice: SystemNotice, onToggle: (Boolean) -> Unit, onDelete: () -> Unit) {
     ListItem(
         headlineContent = { Text(notice.title) },
         supportingContent = { Text("${notice.type} • ${notice.showAs}\n${notice.message}") },
         trailingContent = {
             Row {
-                Switch(checked = notice.isActive == true, onCheckedChange = { viewModel.toggleNotice(notice.id, it) })
-                IconButton(onClick = { viewModel.deleteNotice(notice.id) }) {
-                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red)
+                Switch(checked = notice.isActive == true, onCheckedChange = onToggle)
+                IconButton(onClick = onDelete) {
+                    Icon(imageVector = Icons.Default.Delete, contentDescription = null, tint = Color.Red)
                 }
             }
         }
@@ -402,7 +304,7 @@ fun UserEditorDialog(
         text = {
             LazyColumn(modifier = Modifier.heightIn(max = 500.dp)) {
                 item { Text("Роли", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(vertical = 8.dp)) }
-                items(roles) { role ->
+                items(items = roles) { role ->
                     val hasRole = user.roles.any { it.type == role }
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { onRoleToggle(role, !hasRole) }.padding(8.dp),
@@ -414,7 +316,7 @@ fun UserEditorDialog(
                 }
 
                 item { Text("Значки", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(vertical = 8.dp)) }
-                items(availableBadges) { badge ->
+                items(items = availableBadges) { badge ->
                     val hasBadge = user.badges.any { it.code == badge.code }
                     Row(
                         modifier = Modifier.fillMaxWidth().clickable { onBadgeToggle(badge.code, !hasBadge, null) }.padding(8.dp),
@@ -435,13 +337,13 @@ fun UserEditorDialog(
                 if (sessions.isEmpty()) {
                     item { Text("Нет активных сеансов", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(8.dp)) }
                 } else {
-                    items(sessions) { session ->
+                    items(items = sessions) { session ->
                         ListItem(
                             headlineContent = { Text(session.deviceName ?: "Устройство", style = MaterialTheme.typography.bodySmall) },
                             supportingContent = { Text("${session.platform} • ${session.safeIpText}", style = MaterialTheme.typography.labelSmall) },
                             trailingContent = {
                                 IconButton(onClick = { onRevokeSession(session.id) }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Revoke", tint = Color.Red, modifier = Modifier.size(16.dp))
+                                    Icon(imageVector = Icons.Default.Close, contentDescription = "Revoke", tint = Color.Red, modifier = Modifier.size(16.dp))
                                 }
                             }
                         )
@@ -503,11 +405,4 @@ fun CreateNoticeDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Отмена") } }
     )
-}
-
-@Composable
-fun EmptyState(text: String) {
-    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-        Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
 }

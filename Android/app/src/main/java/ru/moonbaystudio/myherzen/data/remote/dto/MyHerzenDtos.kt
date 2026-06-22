@@ -19,11 +19,17 @@ data class GoogleLoginRequest(
 data class AssistantChatRequest(
     val message: String,
     val persona: String,
+    val messages: List<AssistantChatMessagePayload>? = null,
     val context: AssistantContext,
     @SerializedName("conversationId") val conversationId: String,
     @SerializedName("groupId") val groupId: Int?,
     @SerializedName("targetDate") val targetDate: String?,
     @SerializedName("cachedSchedule") val cachedSchedule: CachedSchedulePayload?
+)
+
+data class AssistantChatMessagePayload(
+    val role: String,
+    val content: String
 )
 
 data class AssistantContext(
@@ -42,7 +48,7 @@ data class CachedScheduleLessonPayload(
     val type: String?,
     @SerializedName("startTime") val startTime: String,
     @SerializedName("endTime") val endTime: String,
-    val date: String,
+    val date: String? = null,
     val room: String?,
     val teacher: String?,
     @SerializedName("roomId") val roomId: Int?,
@@ -59,6 +65,16 @@ data class AssistantChatResponse(
 )
 
 data class PasswordLoginRequest(
+    val email: String,
+    val password: String,
+    @SerializedName("deviceId") val deviceId: String?,
+    @SerializedName("deviceName") val deviceName: String?,
+    val platform: String = "android",
+    @SerializedName("appVersion") val appVersion: String?
+)
+
+data class RegisterRequest(
+    val name: String,
     val email: String,
     val password: String,
     @SerializedName("deviceId") val deviceId: String?,
@@ -258,7 +274,7 @@ data class AdminUserDto(
 
 data class AdminRoleRequestDto(
     val id: Int,
-    @SerializedName("user_id") val userId: Int,
+    @SerializedName("user_id") val userId: String,
     @SerializedName("user_email") val userEmail: String?,
     @SerializedName("role_type") val roleType: String,
     val status: String,

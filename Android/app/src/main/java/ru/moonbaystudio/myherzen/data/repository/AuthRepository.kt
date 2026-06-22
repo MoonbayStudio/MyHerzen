@@ -38,6 +38,23 @@ class AuthRepository @Inject constructor(
         }
     }
 
+    suspend fun register(name: String, email: String, password: String): Result<Unit> {
+        val deviceIdValue = userPreferences.deviceId.first()
+        val request = RegisterRequest(
+            name = name,
+            email = email,
+            password = password,
+            deviceId = deviceIdValue,
+            deviceName = android.os.Build.MODEL,
+            appVersion = "1.0"
+        )
+        return safeApiCall { apiService.register(request) }.toResult().map { body ->
+            userPreferences.saveAuthToken(body.token)
+            _currentUser.value = body.user
+            Unit
+        }
+    }
+
     suspend fun googleLogin(idToken: String): Result<Unit> {
         val deviceIdValue = userPreferences.deviceId.first()
         val request = GoogleLoginRequest(
@@ -104,7 +121,7 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun getSessions(): List<AccountSession> {
-        return safeApiCall { apiService.getSessions() }.onSuccess { it }.getOrElse { emptyList() }
+        return safeApiCall { apiService.getSessions() }.getOrElse { emptyList() }
     }
 
     suspend fun revokeSession(sessionId: String): Result<Unit> {
@@ -116,7 +133,7 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun getMyRoleRequests(): List<RoleRequest> {
-        return safeApiCall { apiService.getMyRoleRequests() }.onSuccess { it }.getOrElse { emptyList() }
+        return safeApiCall { apiService.getMyRoleRequests() }.getOrElse { emptyList() }
     }
 
     suspend fun createRoleRequest(type: String, groupId: Int?, groupName: String?, comment: String?): Result<RoleRequest> {
@@ -132,15 +149,15 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun getGroupUsers(groupId: Int): List<GroupUserDto> {
-        return safeApiCall { apiService.getGroupUsers(groupId) }.onSuccess { it }.getOrElse { emptyList() }
+        return safeApiCall { apiService.getGroupUsers(groupId) }.getOrElse { emptyList() }
     }
 
     suspend fun getAdminUsers(): List<AdminUserDto> {
-        return safeApiCall { apiService.getAdminUsers() }.onSuccess { it }.getOrElse { emptyList() }
+        return safeApiCall { apiService.getAdminUsers() }.getOrElse { emptyList() }
     }
 
     suspend fun getAdminRoleRequests(status: String): List<AdminRoleRequestDto> {
-        return safeApiCall { apiService.getAdminRoleRequests(status) }.onSuccess { it }.getOrElse { emptyList() }
+        return safeApiCall { apiService.getAdminRoleRequests(status) }.getOrElse { emptyList() }
     }
 
     suspend fun approveRoleRequest(requestId: Int): Result<Unit> {
@@ -204,7 +221,7 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun getAdminUserSessions(userId: String): List<AccountSession> {
-        return safeApiCall { apiService.getAdminUserSessions(userId) }.onSuccess { it }.getOrElse { emptyList() }
+        return safeApiCall { apiService.getAdminUserSessions(userId) }.getOrElse { emptyList() }
     }
 
     suspend fun revokeAdminSession(sessionId: String): Result<Unit> {

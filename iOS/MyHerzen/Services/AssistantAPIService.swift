@@ -26,6 +26,7 @@ struct CachedSchedulePayload: Encodable {
 struct AssistantChatRequestPayload: Encodable {
     let message: String
     let persona: String
+    let messages: [AssistantChatMessagePayload]?
     let context: AssistantChatContextPayload?
     let conversationId: String?
     let groupId: Int?
@@ -47,6 +48,7 @@ final class AssistantAPIService {
     func sendChatMessage(
         message: String,
         persona: AssistantPersona,
+        messages: [AssistantChatMessagePayload]? = nil,
         conversationId: String?,
         groupId: Int?,
         targetDate: String?,
@@ -55,6 +57,7 @@ final class AssistantAPIService {
         let payload = AssistantChatRequestPayload(
             message: message,
             persona: persona.rawValue,
+            messages: messages,
             context: AssistantChatContextPayload(selectedGroupId: groupId, selectedDate: targetDate),
             conversationId: conversationId,
             groupId: groupId,

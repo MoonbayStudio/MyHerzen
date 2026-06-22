@@ -4,6 +4,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -24,19 +26,25 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import ru.moonbaystudio.myherzen.data.local.preferences.UserPreferences
+import ru.moonbaystudio.myherzen.ui.viewmodel.AuthViewModel
 import ru.moonbaystudio.myherzen.ui.components.ThemedBackground
 import ru.moonbaystudio.myherzen.ui.screens.AboutScreen
 import ru.moonbaystudio.myherzen.ui.screens.AccessibilitySettingsScreen
 import ru.moonbaystudio.myherzen.ui.screens.AccountScreen
 import ru.moonbaystudio.myherzen.ui.screens.AccountSessionsScreen
 import ru.moonbaystudio.myherzen.ui.screens.AdminPanelScreen
+import ru.moonbaystudio.myherzen.ui.viewmodel.AdminViewModel
 import ru.moonbaystudio.myherzen.ui.screens.AssistantScreen
 import ru.moonbaystudio.myherzen.ui.screens.EmailChangeScreen
 import ru.moonbaystudio.myherzen.ui.screens.GroupMembersScreen
 import ru.moonbaystudio.myherzen.ui.screens.GroupSelectionScreen
 import ru.moonbaystudio.myherzen.ui.screens.LoginScreen
 import ru.moonbaystudio.myherzen.ui.screens.MenuScreen
+import ru.moonbaystudio.myherzen.ui.screens.OnboardingScreen
 import ru.moonbaystudio.myherzen.ui.screens.PasswordSetupScreen
 import ru.moonbaystudio.myherzen.ui.screens.ProfileEditorScreen
 import ru.moonbaystudio.myherzen.ui.screens.ScheduleScreen
@@ -57,10 +65,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Обработка Deep Link при запуске
+        intent?.data?.let { handleAuthDeepLink(it) }
+
         setContent {
             val selectedThemeId by userPreferences.selectedThemeId.collectAsState(initial = "classic")
             val liveActivityEnabled by userPreferences.liveActivityEnabled.collectAsState(initial = true)
+            val highContrast by userPreferences.highContrast.collectAsState(initial = false)
+            val largerText by userPreferences.largerText.collectAsState(initial = false)
             val selectedGroupId by userPreferences.selectedGroupId.collectAsState(initial = null)
+            val onboardingCompleted by userPreferences.onboardingCompleted.collectAsState(initial = null)
             val appTheme = AppThemeCatalog.theme(selectedThemeId)
 
             LaunchedEffect(liveActivityEnabled, selectedGroupId) {
@@ -76,13 +91,34 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            MyHerzenTheme(appTheme = appTheme) {
+            MyHerzenTheme(
+                appTheme = appTheme,
+                highContrast = highContrast,
+                largerText = largerText
+            ) {
                 ThemedBackground(theme = appTheme) {
-                    AppNavigation(selectedGroupId)
+                    AppNavigation(selectedGroupId, onboardingCompleted)
                 }
             }
         }
     }
+
+    override fun onNewIntent(intent: android.content.Intent?) {
+        super.onNewIntent(intent)
+        intent?.data?.let { handleAuthDeepLink(it) }
+    }
+
+    private fun handleAuthDeepLink(uri: android.net.Uri) {
+        if (uri.scheme == "myherzen" && uri.host == "auth") {
+            val token = uri.getQueryParameter("token")
+            if (token != null) {
+                CoroutineScope(Dispatchers.Main).launch {
+                    userPreferences.saveAuthToken(token)
+                }
+            }
+        }
+    }
+
 }
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
@@ -94,9 +130,13 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 }
 
 @Composable
-fun AppNavigation(selectedGroupId: Int?) {
+fun AppNavigation(selectedGroupId: Int?, onboardingCompleted: Boolean?) {
+    if (onboardingCompleted == null) return // Wait for preferences to load
+
     val navController = rememberNavController()
-    val startDestination = if (selectedGroupId != null) Screen.Schedule.route else "group_selection"
+    val startDestination = if (onboardingCompleted == false) "onboarding"
+                          else if (selectedGroupId != null) Screen.Schedule.route
+                          else "group_selection"
 
     val items = listOf(
         Screen.Schedule,
@@ -110,8 +150,21 @@ fun AppNavigation(selectedGroupId: Int?) {
         NavHost(
             navController = navController,
             startDestination = startDestination,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
+            enterTransition = { fadeIn(animationSpec = tween(400)) + slideInHorizontally(initialOffsetX = { it / 4 }, animationSpec = tween(400)) },
+            exitTransition = { fadeOut(animationSpec = tween(400)) + slideOutHorizontally(targetOffsetX = { -it / 4 }, animationSpec = tween(400)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(400)) + slideInHorizontally(initialOffsetX = { -it / 4 }, animationSpec = tween(400)) },
+            popExitTransition = { fadeOut(animationSpec = tween(400)) + slideOutHorizontally(targetOffsetX = { it / 4 }, animationSpec = tween(400)) }
         ) {
+            composable("onboarding") {
+                OnboardingScreen(
+                    onFinish = {
+                        navController.navigate(if (selectedGroupId != null) Screen.Schedule.route else "group_selection") {
+                            popUpTo("onboarding") { inclusive = true }
+                        }
+                    }
+                )
+            }
             composable("group_selection") {
                 GroupSelectionScreen(
                     onGroupSelected = {
@@ -272,4 +325,5 @@ fun BottomIsland(
             }
         }
     }
+
 }

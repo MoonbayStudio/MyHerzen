@@ -31,6 +31,7 @@ import ru.moonbaystudio.myherzen.ui.components.CapsuleHeader
 import ru.moonbaystudio.myherzen.ui.components.UserBadgeRow
 import ru.moonbaystudio.myherzen.ui.viewmodel.AuthViewModel
 import ru.moonbaystudio.myherzen.ui.viewmodel.SettingsViewModel
+import ru.moonbaystudio.myherzen.util.performGoogleSignIn
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -228,7 +229,7 @@ fun AccountScreen(
                     OutlinedButton(
                         onClick = { 
                             scope.launch {
-                                handleGoogleSignIn(context, viewModel)
+                                performGoogleSignIn(context, viewModel)
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),

@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Form
+from fastapi.responses import RedirectResponse
 from jose import jwt
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -809,3 +810,52 @@ async def apple_login(
     except Exception as error:
         print(f"Apple auth error: {type(error).__name__} - {error}")
         raise HTTPException(status_code=401, detail="Apple auth failed")
+
+
+@router.post("/auth/apple/callback")
+async def apple_callback(
+    request: Request,
+    id_token: str = Form(...),
+    code: str = Form(None),
+    user: str = Form(None),  # Apple присылает JSON со сведениями о пользователе только при первой авторизации
+    db: Session = Depends(get_db),
+):
+    """
+    Обработчик для Sign in with Apple (Web/Android).
+    Apple отправляет id_token методом POST (form_post).
+    """
+    import json
+
+    # 1. Парсим данные пользователя, если они есть
+    full_name = None
+    if user:
+        try:
+            user_data = json.loads(user)
+            name_info = user_data.get("name", {})
+            first_name = name_info.get("firstName", "")
+            last_name = name_info.get("lastName", "")
+            full_name = f"{first_name} {last_name}".strip() or None
+        except:
+            pass
+
+    # 2. Подготавливаем данные для существующей функции apple_login
+    login_data = AppleLoginRequest(
+        identityToken=id_token,
+        fullName=full_name,
+        # Для Android/Web Flow параметры устройства пустые или стандартные
+        deviceId="android-web-flow",
+        deviceName="Android Browser",
+        platform="android",
+        appVersion="1.0"
+    )
+
+    # 3. Вызываем авторизацию
+    try:
+        result = await apple_login(request, login_data, db)
+        token = result["token"]
+        # 4. Редиректим обратно в мобильное приложение через Deep Link
+        return RedirectResponse(url=f"myherzen://auth?token={token}", status_code=303)
+    except Exception as e:
+        print(f"Apple callback error: {e}")
+        # В случае ошибки возвращаем в приложение с ошибкой
+        return RedirectResponse(url=f"myherzen://auth?error=auth_failed", status_code=303)

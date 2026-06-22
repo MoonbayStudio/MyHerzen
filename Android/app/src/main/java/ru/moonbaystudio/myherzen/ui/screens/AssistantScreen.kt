@@ -8,8 +8,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -74,6 +75,9 @@ fun AssistantScreen(
                 title = "Пеликаша",
                 subtitle = selectedPersona.displayName,
                 actions = {
+                    IconButton(onClick = { viewModel.clearHistory() }) {
+                        Icon(imageVector = Icons.Default.Delete, contentDescription = "Очистить чат")
+                    }
                     ActionCapsule(icon = Icons.Default.Face, onClick = { showPersonaSelection = true })
                 }
             )
@@ -117,7 +121,7 @@ fun AssistantScreen(
                             if (isLoading) {
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp))
                             } else {
-                                Icon(Icons.Default.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
+                                Icon(imageVector = Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
                             }
                         }
                     }
@@ -138,7 +142,7 @@ fun AssistantScreen(
                     EmptyAssistantState(selectedPersona)
                 }
             }
-            items(messages) { message ->
+            items(items = messages) { message ->
                 MessageBubble(message)
             }
         }

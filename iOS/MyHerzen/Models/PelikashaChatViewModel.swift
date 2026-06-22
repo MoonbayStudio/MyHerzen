@@ -8,6 +8,13 @@ final class PelikashaChatViewModel: ObservableObject {
         var title: String
         var messages: [PelikashaMessage]
         var updatedAt: Date
+        var summary: String?
+        var summarizedMessageIDs: [UUID]?
+    }
+
+    private struct ScheduleContext {
+        let text: String?
+        let cachedPayload: CachedSchedulePayload?
     }
 
     @Published var messages: [PelikashaMessage] = []
@@ -27,16 +34,18 @@ final class PelikashaChatViewModel: ObservableObject {
     private var currentTask: Task<Void, Never>?
     private var lastUserMessage: String?
     private let historyKey = "pelikashaChatHistory"
+    private let activeDialogIDKey = "pelikashaActiveDialogID"
 
     init(selectedDateProvider: @escaping () -> Date? = { nil }) {
         self.selectedDateProvider = selectedDateProvider
         let rawPersona = UserDefaults.standard.string(forKey: "assistantDefaultPersona")
         self.selectedPersona = AssistantPersona(rawValue: rawPersona ?? "") ?? .pelikasha
         history = Self.loadHistory(key: historyKey)
-        if let first = history.first {
-            currentDialogID = first.id
-            messages = first.messages
-            lastUserMessage = first.messages.last(where: { $0.role == .user })?.text
+        if let activeID = Self.loadActiveDialogID(key: activeDialogIDKey),
+           let activeDialog = history.first(where: { $0.id == activeID }) {
+            applyActiveDialog(activeDialog)
+        } else if let first = history.first {
+            applyActiveDialog(first)
         } else {
             persistCurrentDialog(title: "Новый диалог")
         }
@@ -46,16 +55,18 @@ final class PelikashaChatViewModel: ObservableObject {
         let text = inputText.myherzenTrimmed
         guard !text.isEmpty, !isLoading else { return }
         inputText = ""
+        ensureActiveConversation()
         messages.append(PelikashaMessage(role: .user, text: text))
         lastUserMessage = text
-        persistCurrentDialog()
-        send(text)
+        let dialog = persistCurrentDialog()
+        send(promptDialog: promptDialog(from: dialog))
     }
 
     func retryLastMessage() {
-        guard !isLoading, let text = lastUserMessage else { return }
+        guard !isLoading, lastUserMessage != nil else { return }
         messages.removeAll { $0.role == .systemLocal }
-        send(text)
+        let dialog = persistCurrentDialog()
+        send(promptDialog: promptDialog(from: dialog))
     }
 
     func appendLocalSystemMessage(_ text: String) {
@@ -74,6 +85,7 @@ final class PelikashaChatViewModel: ObservableObject {
     func startNewDialog() {
         cancelCurrentRequest()
         currentDialogID = UUID()
+        saveActiveDialogID()
         messages = []
         lastUserMessage = nil
         persistCurrentDialog(title: "Новый диалог")
@@ -82,17 +94,21 @@ final class PelikashaChatViewModel: ObservableObject {
     func openDialog(id: UUID) {
         guard let dialog = history.first(where: { $0.id == id }) else { return }
         cancelCurrentRequest()
-        currentDialogID = dialog.id
-        messages = dialog.messages
-        lastUserMessage = dialog.messages.last(where: { $0.role == .user })?.text
+        applyActiveDialog(dialog)
     }
 
     func deleteDialog(id: UUID) {
         history.removeAll { $0.id == id }
         if currentDialogID == id {
-            currentDialogID = UUID()
-            messages = []
-            lastUserMessage = nil
+            if let latest = history.first {
+                applyActiveDialog(latest)
+            } else {
+                currentDialogID = UUID()
+                saveActiveDialogID()
+                messages = []
+                lastUserMessage = nil
+                persistCurrentDialog(title: "Новый диалог")
+            }
         }
         saveHistory()
     }
@@ -100,48 +116,92 @@ final class PelikashaChatViewModel: ObservableObject {
     func clearHistory() {
         history = []
         currentDialogID = UUID()
+        saveActiveDialogID()
         messages = []
         lastUserMessage = nil
         saveHistory()
         persistCurrentDialog(title: "Новый диалог")
     }
 
-    private func send(_ text: String) {
+    private func send(promptDialog: PelikashaPromptDialog) {
         currentTask?.cancel()
         isLoading = true
         let persona = selectedPersona
-        let targetDate = selectedDateProvider().map(Self.dateString)
+        let targetDateValue = selectedDateProvider() ?? Date()
+        let targetDate = Self.dateString(targetDateValue)
+        let groupId = Self.selectedGroupId
         currentTask = Task { [weak self] in
             do {
+                let scheduleContext = await Self.scheduleContext(groupId: groupId, date: targetDateValue)
+                let promptMessages = PelikashaPromptBuilder.buildMessages(
+                    personaRawValue: persona.rawValue,
+                    dialog: promptDialog,
+                    scheduleContext: scheduleContext.text
+                )
+                let contextualMessage = PelikashaPromptBuilder.legacyMessage(from: promptMessages)
                 let response = try await AssistantAPIService.shared.sendChatMessage(
-                    message: text,
+                    message: contextualMessage,
                     persona: persona,
+                    messages: promptMessages,
                     conversationId: self?.currentDialogID.uuidString,
-                    groupId: Self.selectedGroupId,
+                    groupId: groupId,
                     targetDate: targetDate,
-                    cachedSchedule: nil
+                    cachedSchedule: scheduleContext.cachedPayload
                 )
                 guard !Task.isCancelled else { return }
                 self?.remaining = response.remaining
                 self?.messages.append(PelikashaMessage(role: .assistant, text: response.reply, persona: persona))
+                self?.persistCurrentDialog()
+                self?.summarizeCurrentDialogIfNeeded()
             } catch {
                 guard !Task.isCancelled else { return }
                 self?.appendLocalSystemMessage(Self.errorMessage(for: error))
             }
             self?.isLoading = false
             self?.currentTask = nil
-            self?.persistCurrentDialog()
         }
     }
 
-    private func persistCurrentDialog(title explicitTitle: String? = nil) {
+    @discardableResult
+    private func persistCurrentDialog(title explicitTitle: String? = nil) -> DialogRecord {
         let title = explicitTitle ?? messages.first(where: { $0.role == .user })?.text ?? "Новый диалог"
         let trimmedTitle = Self.normalizedDialogTitle(title)
-        let record = DialogRecord(id: currentDialogID, title: trimmedTitle, messages: messages, updatedAt: Date())
+        let existing = history.first { $0.id == currentDialogID }
+        let record = DialogRecord(
+            id: currentDialogID,
+            title: trimmedTitle,
+            messages: messages,
+            updatedAt: Date(),
+            summary: existing?.summary,
+            summarizedMessageIDs: existing?.summarizedMessageIDs
+        )
         history.removeAll { $0.id == currentDialogID }
         history.insert(record, at: 0)
         history = Array(history.prefix(25))
+        saveActiveDialogID()
         saveHistory()
+        return record
+    }
+
+    private func summarizeCurrentDialogIfNeeded() {
+        guard let current = history.first(where: { $0.id == currentDialogID }) else { return }
+        guard let summaryResult = PelikashaConversationSummaryService.summarizeIfNeeded(promptDialog(from: current)) else { return }
+        var updated = current
+        updated.summary = summaryResult.summary
+        updated.summarizedMessageIDs = summaryResult.summarizedMessageIDs
+        history.removeAll { $0.id == currentDialogID }
+        history.insert(updated, at: 0)
+        saveHistory()
+    }
+
+    private func promptDialog(from dialog: DialogRecord) -> PelikashaPromptDialog {
+        PelikashaPromptDialog(
+            messages: dialog.messages.map { message in
+                PelikashaPromptMessage(id: message.id, role: message.role.rawValue, text: message.text)
+            },
+            summary: dialog.summary,
+            summarizedMessageIDs: dialog.summarizedMessageIDs ?? []
+        )
     }
 
     private func saveHistory() {
@@ -150,12 +210,51 @@ final class PelikashaChatViewModel: ObservableObject {
         }
     }
 
+    private func saveActiveDialogID() {
+        UserDefaults.standard.set(currentDialogID.uuidString, forKey: activeDialogIDKey)
+    }
+
+    @discardableResult
+    private func ensureActiveConversation() -> UUID {
+        if history.contains(where: { $0.id == currentDialogID }) {
+            saveActiveDialogID()
+            return currentDialogID
+        }
+
+        if !messages.isEmpty {
+            persistCurrentDialog()
+            return currentDialogID
+        }
+
+        if let latest = history.first {
+            applyActiveDialog(latest)
+        } else {
+            currentDialogID = UUID()
+            saveActiveDialogID()
+            persistCurrentDialog(title: "Новый диалог")
+        }
+
+        return currentDialogID
+    }
+
+    private func applyActiveDialog(_ dialog: DialogRecord) {
+        currentDialogID = dialog.id
+        saveActiveDialogID()
+        messages = dialog.messages
+        lastUserMessage = dialog.messages.last(where: { $0.role == .user })?.text
+    }
+
     private static func loadHistory(key: String) -> [DialogRecord] {
         guard let data = UserDefaults.standard.data(forKey: key),
               let decoded = try? MyHerzenBackendSystem.jsonDecoder.decode([DialogRecord].self, from: data) else {
             return []
         }
         return decoded.sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    private static func loadActiveDialogID(key: String) -> UUID? {
+        guard let rawValue = UserDefaults.standard.string(forKey: key) else { return nil }
+        return UUID(uuidString: rawValue)
     }
 
     private static func normalizedDialogTitle(_ title: String) -> String {
@@ -171,11 +270,67 @@ final class PelikashaChatViewModel: ObservableObject {
         return Int(value)
     }
 
+    private static func scheduleContext(groupId: Int?, date: Date) async -> ScheduleContext {
+        guard let groupId else {
+            return ScheduleContext(
+                text: "Группа пользователя не выбрана, поэтому точное расписание пар недоступно.",
+                cachedPayload: nil
+            )
+        }
+
+        let groupIdString = String(groupId)
+        let items = await APIService.shared.fetchSchedule(for: groupIdString, date: date)
+        let readableDate = readableDateString(date)
+
+        guard !items.isEmpty else {
+            return ScheduleContext(
+                text: "Группа: \(groupIdString). Дата: \(readableDate). В локальном расписании на эту дату пары не найдены.",
+                cachedPayload: nil
+            )
+        }
+
+        let lines = items.map { item in
+            var parts = ["- \(item.time): \(item.title)"]
+            if !item.lessonType.myherzenTrimmed.isEmpty {
+                parts.append("тип: \(item.lessonType)")
+            }
+            if !item.teacher.myherzenTrimmed.isEmpty {
+                parts.append("преподаватель: \(item.teacher)")
+            }
+            if !item.room.myherzenTrimmed.isEmpty {
+                parts.append("аудитория: \(item.room)")
+            } else if !item.address.myherzenTrimmed.isEmpty {
+                parts.append("адрес: \(item.address)")
+            }
+            if let subgroup = item.subgroup?.myherzenTrimmed, !subgroup.isEmpty {
+                parts.append("подгруппа: \(subgroup)")
+            }
+            return parts.joined(separator: "; ")
+        }
+
+        return ScheduleContext(
+            text: """
+            Группа: \(groupIdString). Дата: \(readableDate).
+            Пары:
+            \(lines.joined(separator: "\n"))
+            """,
+            cachedPayload: PelikashaScheduleContextBuilder.cachedSchedule(from: items, date: date)
+        )
+    }
+
     private static func dateString(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    private static func readableDateString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "ru_RU")
+        formatter.dateFormat = "d MMMM yyyy"
         return formatter.string(from: date)
     }
 

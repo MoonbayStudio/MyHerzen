@@ -33,6 +33,8 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
     // Cache & Live Activity
     private val SCHEDULE_CACHE_WEEKS_KEY = intPreferencesKey("schedule_cache_weeks")
     private val LIVE_ACTIVITY_ENABLED_KEY = booleanPreferencesKey("live_activity_enabled")
+    private val ONBOARDING_COMPLETED_KEY = booleanPreferencesKey("onboarding_completed")
+    private val ASSISTANT_HISTORY_KEY = stringPreferencesKey("assistant_chat_history")
 
     val authToken: Flow<String?> = context.dataStore.data.map { it[TOKEN_KEY] }
     val selectedGroupId: Flow<Int?> = context.dataStore.data.map { it[GROUP_ID_KEY] }
@@ -49,6 +51,8 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
     
     val scheduleCacheWeeks: Flow<Int> = context.dataStore.data.map { it[SCHEDULE_CACHE_WEEKS_KEY] ?: 2 }
     val liveActivityEnabled: Flow<Boolean> = context.dataStore.data.map { it[LIVE_ACTIVITY_ENABLED_KEY] ?: true }
+    val onboardingCompleted: Flow<Boolean> = context.dataStore.data.map { it[ONBOARDING_COMPLETED_KEY] ?: false }
+    val assistantHistory: Flow<String?> = context.dataStore.data.map { it[ASSISTANT_HISTORY_KEY] }
     
     val deviceId: Flow<String> = context.dataStore.data.map { 
         it[DEVICE_ID_KEY] ?: run {
@@ -111,6 +115,18 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
 
     suspend fun updateLiveActivityEnabled(enabled: Boolean) {
         context.dataStore.edit { it[LIVE_ACTIVITY_ENABLED_KEY] = enabled }
+    }
+
+    suspend fun setOnboardingCompleted(completed: Boolean) {
+        context.dataStore.edit { it[ONBOARDING_COMPLETED_KEY] = completed }
+    }
+
+    suspend fun saveAssistantHistory(historyJson: String) {
+        context.dataStore.edit { it[ASSISTANT_HISTORY_KEY] = historyJson }
+    }
+
+    suspend fun clearAssistantHistory() {
+        context.dataStore.edit { it.remove(ASSISTANT_HISTORY_KEY) }
     }
 
     private suspend fun saveDeviceId(id: String) {

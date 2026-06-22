@@ -21,9 +21,19 @@ class SettingsViewModel @Inject constructor(
     val selectedThemeId = userPreferences.selectedThemeId.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "classic")
     val scheduleCacheWeeks = userPreferences.scheduleCacheWeeks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 2)
     val liveActivityEnabled = userPreferences.liveActivityEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val highContrast = userPreferences.highContrast.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val largerText = userPreferences.largerText.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     fun updateDefaultPersona(persona: String) = viewModelScope.launch {
         userPreferences.updateDefaultPersona(persona)
+    }
+
+    fun updateHighContrast(enabled: Boolean) = viewModelScope.launch {
+        userPreferences.updateHighContrast(enabled)
+    }
+
+    fun updateLargerText(enabled: Boolean) = viewModelScope.launch {
+        userPreferences.updateLargerText(enabled)
     }
 
     fun updateTheme(themeId: String) = viewModelScope.launch {

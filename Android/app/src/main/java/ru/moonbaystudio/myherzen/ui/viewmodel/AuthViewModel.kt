@@ -55,6 +55,18 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    fun register(name: String, email: String, password: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            val result = authRepository.register(name, email, password)
+            if (result.isFailure) {
+                _error.value = result.exceptionOrNull()?.message ?: "Registration failed"
+            }
+            _isLoading.value = false
+        }
+    }
+
     fun googleLogin(idToken: String) {
         viewModelScope.launch {
             _isLoading.value = true
