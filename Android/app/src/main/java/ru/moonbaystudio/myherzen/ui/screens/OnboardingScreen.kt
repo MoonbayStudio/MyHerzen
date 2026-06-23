@@ -8,8 +8,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -23,17 +26,27 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import ru.moonbaystudio.myherzen.R
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import ru.moonbaystudio.myherzen.data.model.MyGroup
 import ru.moonbaystudio.myherzen.ui.viewmodel.AuthViewModel
 import ru.moonbaystudio.myherzen.util.performAppleSignIn
 import ru.moonbaystudio.myherzen.util.performGoogleSignIn
 import ru.moonbaystudio.myherzen.ui.viewmodel.GroupSelectionViewModel
 import ru.moonbaystudio.myherzen.ui.viewmodel.OnboardingViewModel
 import ru.moonbaystudio.myherzen.ui.viewmodel.SettingsViewModel
+
+private enum class OnboardingAuthFlow {
+    Login,
+    Signup,
+    Social
+}
 
 @Composable
 fun OnboardingScreen(
@@ -45,6 +58,7 @@ fun OnboardingScreen(
 ) {
     val pagerState = rememberPagerState(pageCount = { 5 })
     val currentStep by viewModel.currentStep.collectAsState()
+    val defaultGroupId by groupViewModel.selectedGroupId.collectAsState(initial = null)
 
     LaunchedEffect(currentStep) {
         if (currentStep < 5) {
@@ -65,7 +79,15 @@ fun OnboardingScreen(
                 userScrollEnabled = false
             ) { page ->
                 when (page) {
-                    0 -> OnboardingAuthStep(authViewModel) { viewModel.nextStep() }
+                    0 -> OnboardingAuthStep(
+                        viewModel = authViewModel,
+                        defaultGroupId = defaultGroupId,
+                        onAccountReady = {
+                            viewModel.completeOnboarding()
+                            onFinish()
+                        },
+                        onContinue = { viewModel.nextStep() }
+                    )
                     1 -> OnboardingGroupStep(groupViewModel) { viewModel.nextStep() }
                     2 -> OnboardingAccessibilityStep(settingsViewModel) { viewModel.nextStep() }
                     3 -> OnboardingCacheStep(settingsViewModel) { viewModel.nextStep() }
@@ -130,17 +152,45 @@ fun OnboardingScreen(
 }
 
 @Composable
-fun OnboardingAuthStep(viewModel: AuthViewModel, onNext: () -> Unit) {
+fun OnboardingAuthStep(
+    viewModel: AuthViewModel,
+    defaultGroupId: Int?,
+    onAccountReady: () -> Unit,
+    onContinue: () -> Unit
+) {
     val isLoggedIn by viewModel.isLoggedIn.collectAsState(initial = false)
+    val isLoading by viewModel.isLoading.collectAsState()
+    val isVerificationRequired by viewModel.isVerificationRequired.collectAsState()
+    val error by viewModel.error.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val latestDefaultGroupId by rememberUpdatedState(defaultGroupId)
+    var authFlow by remember { mutableStateOf<OnboardingAuthFlow?>(null) }
+    var didHandleAuth by remember { mutableStateOf(false) }
+    var showEmailAuth by remember { mutableStateOf(false) }
+    var isRegisterMode by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var verificationCode by remember { mutableStateOf("") }
 
-    LaunchedEffect(isLoggedIn) {
-        if (isLoggedIn) onNext()
+    LaunchedEffect(isLoggedIn, isLoading) {
+        if (isLoggedIn && !isLoading && !didHandleAuth) {
+            didHandleAuth = true
+            delay(200)
+            if (authFlow == OnboardingAuthFlow.Signup || latestDefaultGroupId == null) {
+                onContinue()
+            } else {
+                onAccountReady()
+            }
+        }
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -161,12 +211,127 @@ fun OnboardingAuthStep(viewModel: AuthViewModel, onNext: () -> Unit) {
 
         Spacer(Modifier.height(48.dp))
 
+        if (showEmailAuth) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.42f))
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (isVerificationRequired) {
+                        Text("Подтвердите регистрацию", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        OutlinedTextField(
+                            value = verificationCode,
+                            onValueChange = { verificationCode = it.filter(Char::isDigit).take(6) },
+                            label = { Text("Код из письма") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        )
+                        Button(
+                            onClick = {
+                                authFlow = OnboardingAuthFlow.Signup
+                                viewModel.verifySignup(verificationCode)
+                            },
+                            enabled = !isLoading && verificationCode.length == 6,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp))
+                            else Text("Подтвердить")
+                        }
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = !isRegisterMode,
+                                onClick = { isRegisterMode = false },
+                                label = { Text("Вход") }
+                            )
+                            FilterChip(
+                                selected = isRegisterMode,
+                                onClick = { isRegisterMode = true },
+                                label = { Text("Регистрация") }
+                            )
+                        }
+
+                        if (isRegisterMode) {
+                            OutlinedTextField(
+                                value = name,
+                                onValueChange = { name = it },
+                                label = { Text("Имя") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true
+                            )
+                        }
+                        OutlinedTextField(
+                            value = email,
+                            onValueChange = { email = it },
+                            label = { Text("Email") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+                        )
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it },
+                            label = { Text("Пароль") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
+                        )
+                        Button(
+                            onClick = {
+                                didHandleAuth = false
+                                if (isRegisterMode) {
+                                    authFlow = OnboardingAuthFlow.Signup
+                                    viewModel.register(name, email, password)
+                                } else {
+                                    authFlow = OnboardingAuthFlow.Login
+                                    viewModel.login(email, password)
+                                }
+                            },
+                            enabled = !isLoading && email.isNotBlank() && password.isNotBlank() && (!isRegisterMode || name.isNotBlank()),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            if (isLoading) CircularProgressIndicator(modifier = Modifier.size(18.dp))
+                            else Text(if (isRegisterMode) "Создать аккаунт" else "Войти")
+                        }
+                    }
+
+                    if (error != null) {
+                        Text(
+                            error!!,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        } else {
+            OutlinedButton(
+                onClick = { showEmailAuth = true },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Icon(Icons.Default.Email, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Войти или зарегистрироваться по email")
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Button(
                 onClick = {
+                    didHandleAuth = false
+                    authFlow = OnboardingAuthFlow.Social
                     scope.launch {
                         performGoogleSignIn(context, viewModel)
                     }
@@ -190,7 +355,11 @@ fun OnboardingAuthStep(viewModel: AuthViewModel, onNext: () -> Unit) {
             }
 
             Button(
-                onClick = { performAppleSignIn(context) },
+                onClick = {
+                    didHandleAuth = false
+                    authFlow = OnboardingAuthFlow.Social
+                    performAppleSignIn(context)
+                },
                 modifier = Modifier.weight(1f).height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
@@ -211,7 +380,7 @@ fun OnboardingAuthStep(viewModel: AuthViewModel, onNext: () -> Unit) {
 
         Spacer(Modifier.height(16.dp))
 
-        TextButton(onClick = onNext) {
+        TextButton(onClick = onContinue) {
             Text("Пропустить", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -221,6 +390,64 @@ fun OnboardingAuthStep(viewModel: AuthViewModel, onNext: () -> Unit) {
 fun OnboardingGroupStep(viewModel: GroupSelectionViewModel, onNext: () -> Unit) {
     val institutes by viewModel.institutes.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val selectionMessage by viewModel.selectionMessage.collectAsState()
+    val isSelectingGroup by viewModel.isSelectingGroup.collectAsState()
+    val defaultGroupId by viewModel.selectedGroupId.collectAsState(initial = null)
+    var pendingGroup by remember { mutableStateOf<MyGroup?>(null) }
+    var pendingWarning by remember { mutableStateOf<GroupSelectionWarning?>(null) }
+
+    fun applyGroupSelection(group: MyGroup) {
+        val groupId = group.id.toIntOrNull() ?: return
+        viewModel.selectGroup(groupId, group.name) {
+            onNext()
+        }
+    }
+
+    fun requestGroupSelection(group: MyGroup) {
+        if (defaultGroupId == null) {
+            pendingGroup = group
+            pendingWarning = GroupSelectionWarning.InitialDefaultGroup
+            return
+        }
+        applyGroupSelection(group)
+    }
+
+    if (pendingWarning != null) {
+        AlertDialog(
+            onDismissRequest = {
+                pendingGroup = null
+                pendingWarning = null
+            },
+            title = { Text("Группа по умолчанию") },
+            text = {
+                Text("Эта группа будет привязана к аккаунту. По ней будут показываться домашка и участники. Позже сменить её можно будет только через заявку модератору.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val group = pendingGroup
+                        pendingGroup = null
+                        pendingWarning = null
+                        if (group != null) {
+                            applyGroupSelection(group)
+                        }
+                    }
+                ) {
+                    Text("Понял")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        pendingGroup = null
+                        pendingWarning = null
+                    }
+                ) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 8.dp),
@@ -239,6 +466,17 @@ fun OnboardingGroupStep(viewModel: GroupSelectionViewModel, onNext: () -> Unit) 
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else {
                 LazyColumn {
+                    if (selectionMessage != null || isSelectingGroup) {
+                        item {
+                            Text(
+                                text = selectionMessage ?: "Обновляем группу",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(12.dp)
+                            )
+                        }
+                    }
                     items(items = institutes) { institute ->
                         var expanded by remember { mutableStateOf(false) }
                         Column {
@@ -258,9 +496,8 @@ fun OnboardingGroupStep(viewModel: GroupSelectionViewModel, onNext: () -> Unit) 
                                         headlineContent = { Text(group.name) },
                                         modifier = Modifier
                                             .padding(start = 16.dp)
-                                            .clickable {
-                                                viewModel.selectGroup(group.id.toInt(), group.name)
-                                                onNext()
+                                            .clickable(enabled = !isSelectingGroup) {
+                                                requestGroupSelection(group)
                                             }
                                     )
                                 }

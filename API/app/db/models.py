@@ -125,6 +125,25 @@ class RoleRequest(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     reviewed_at = Column(DateTime, nullable=True)
 
+
+class GroupChangeRequest(Base):
+    __tablename__ = "group_change_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=False, index=True)
+    user_email = Column(String, nullable=True)
+    current_group_id = Column(Integer, nullable=True, index=True)
+    current_group_name = Column(String, nullable=True)
+    requested_group_id = Column(Integer, nullable=False, index=True)
+    requested_group_name = Column(String, nullable=True)
+    comment = Column(Text, nullable=True)
+    status = Column(String, nullable=False, default="pending", index=True)
+    moderator_id = Column(Integer, nullable=True, index=True)
+    reviewed_by_admin_email = Column(String, nullable=True)
+    review_comment = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    reviewed_at = Column(DateTime, nullable=True)
+
 class Homework(Base):
     __tablename__ = "homework"
 

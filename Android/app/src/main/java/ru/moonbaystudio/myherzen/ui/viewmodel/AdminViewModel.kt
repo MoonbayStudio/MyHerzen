@@ -21,6 +21,9 @@ class AdminViewModel @Inject constructor(
     private val _requests = MutableStateFlow<List<AdminRoleRequestDto>>(emptyList())
     val requests: StateFlow<List<AdminRoleRequestDto>> = _requests.asStateFlow()
 
+    private val _groupChangeRequests = MutableStateFlow<List<GroupChangeRequestDto>>(emptyList())
+    val groupChangeRequests: StateFlow<List<GroupChangeRequestDto>> = _groupChangeRequests.asStateFlow()
+
     private val _badges = MutableStateFlow<List<BadgeDto>>(emptyList())
     val badges: StateFlow<List<BadgeDto>> = _badges.asStateFlow()
 
@@ -46,6 +49,7 @@ class AdminViewModel @Inject constructor(
             try {
                 _users.value = authRepository.getAdminUsers()
                 _requests.value = authRepository.getAdminRoleRequests("pending")
+                _groupChangeRequests.value = authRepository.getGroupChangeRequests("pending")
                 _badges.value = authRepository.getAdminBadges()
                 _settings.value = authRepository.getAdminSettings()
                 _notices.value = authRepository.getAdminSystemNotices()
@@ -66,6 +70,18 @@ class AdminViewModel @Inject constructor(
     fun rejectRequest(requestId: Int) {
         viewModelScope.launch {
             authRepository.rejectRoleRequest(requestId).onSuccess { loadAllData() }
+        }
+    }
+
+    fun approveGroupChangeRequest(requestId: Int) {
+        viewModelScope.launch {
+            authRepository.approveGroupChangeRequest(requestId).onSuccess { loadAllData() }
+        }
+    }
+
+    fun rejectGroupChangeRequest(requestId: Int) {
+        viewModelScope.launch {
+            authRepository.rejectGroupChangeRequest(requestId).onSuccess { loadAllData() }
         }
     }
 

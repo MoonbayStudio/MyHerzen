@@ -176,6 +176,7 @@ fun AccountScreen(
                     
                     AccountOption(icon = Icons.Default.Lock, title = "Безопасность", onClick = { onNavigate("security") })
                     AccountOption(icon = Icons.Default.Person, title = "Моя группа", onClick = { onNavigate("group_members") })
+                    AccountOption(icon = Icons.Default.Edit, title = "Сменить группу по умолчанию", onClick = { onNavigate("default_group_selection") })
 
                     if (currentUser?.isAdmin == true || currentUser?.isModerator == true) {
                         AccountOption(icon = Icons.Default.Settings, title = "Админка", onClick = { onNavigate("admin") })

@@ -23,6 +23,7 @@ import ru.moonbaystudio.myherzen.data.remote.dto.AdminRoleRequestDto
 import ru.moonbaystudio.myherzen.data.remote.dto.AdminRuntimeSetting
 import ru.moonbaystudio.myherzen.data.remote.dto.AdminUserDto
 import ru.moonbaystudio.myherzen.data.remote.dto.BadgeDto
+import ru.moonbaystudio.myherzen.data.remote.dto.GroupChangeRequestDto
 import ru.moonbaystudio.myherzen.data.remote.dto.SystemNotice
 import ru.moonbaystudio.myherzen.data.remote.dto.SystemNoticeMutationRequest
 import ru.moonbaystudio.myherzen.ui.viewmodel.AdminViewModel
@@ -36,6 +37,7 @@ fun AdminPanelScreen(
 ) {
     val users by viewModel.users.collectAsState()
     val requests by viewModel.requests.collectAsState()
+    val groupChangeRequests by viewModel.groupChangeRequests.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val notices by viewModel.notices.collectAsState()
     val badges by viewModel.badges.collectAsState()
@@ -108,7 +110,7 @@ fun AdminPanelScreen(
                 AdminTab.entries.forEach { tab ->
                     val title = when(tab) {
                         AdminTab.USERS -> "Юзеры"
-                        AdminTab.REQUESTS -> "Заявки (${requests.size})"
+                        AdminTab.REQUESTS -> "Заявки (${requests.size + groupChangeRequests.size})"
                         AdminTab.SETTINGS -> "Дебаг"
                         AdminTab.NOTICES -> "Уведомления"
                     }
@@ -164,6 +166,13 @@ fun AdminPanelScreen(
                                 }
                             }
                             AdminTab.REQUESTS -> {
+                                items(items = groupChangeRequests) { request ->
+                                    GroupChangeRequestListItem(
+                                        request = request,
+                                        onApprove = { viewModel.approveGroupChangeRequest(request.id) },
+                                        onReject = { viewModel.rejectGroupChangeRequest(request.id) }
+                                    )
+                                }
                                 items(items = requests) { request ->
                                     RequestListItem(
                                         request = request,
@@ -171,7 +180,7 @@ fun AdminPanelScreen(
                                         onReject = { viewModel.rejectRequest(request.id) }
                                     )
                                 }
-                                if (requests.isEmpty()) {
+                                if (requests.isEmpty() && groupChangeRequests.isEmpty()) {
                                     item { EmptyState("Нет активных заявок") }
                                 }
                             }
@@ -226,6 +235,28 @@ fun UserListItem(user: AdminUserDto, onClick: () -> Unit) {
         },
         trailingContent = { Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
         modifier = Modifier.clickable(onClick = onClick)
+    )
+}
+
+@Composable
+fun GroupChangeRequestListItem(request: GroupChangeRequestDto, onApprove: () -> Unit, onReject: () -> Unit) {
+    val currentGroup = request.currentGroupName ?: request.currentGroupId?.toString() ?: "не выбрана"
+    val requestedGroup = request.requestedGroupName ?: request.requestedGroupId.toString()
+    ListItem(
+        headlineContent = { Text(request.userEmail ?: "ID: ${request.userId}") },
+        supportingContent = {
+            Text("Смена группы: $currentGroup → $requestedGroup\n${request.createdAt}")
+        },
+        trailingContent = {
+            Row {
+                IconButton(onClick = onApprove) {
+                    Icon(imageVector = Icons.Default.Check, contentDescription = "Approve", tint = Color.Green)
+                }
+                IconButton(onClick = onReject) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Reject", tint = Color.Red)
+                }
+            }
+        }
     )
 }
 

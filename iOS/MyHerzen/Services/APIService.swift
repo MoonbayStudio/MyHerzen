@@ -674,6 +674,55 @@ final class APIService {
         }
     }
 
+    func createGroupChangeRequest(
+        requestedGroupId: Int,
+        requestedGroupName: String?,
+        comment: String? = nil
+    ) async throws -> GroupChangeRequestDTO {
+        let payload = GroupChangeRequestCreateRequest(
+            requestedGroupId: requestedGroupId,
+            requestedGroupName: requestedGroupName,
+            comment: comment
+        )
+        var request = try makeAuthorizedMyHerzenRequest(path: "/group-change-requests", method: "POST")
+        request.httpBody = try MyHerzenBackendSystem.jsonEncoder.encode(payload)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data, operation: "createGroupChangeRequest")
+        return try MyHerzenBackendSystem.jsonDecoder.decode(GroupChangeRequestDTO.self, from: data)
+    }
+
+    func fetchMyGroupChangeRequests() async throws -> [GroupChangeRequestDTO] {
+        let request = try makeAuthorizedMyHerzenRequest(path: "/group-change-requests/me")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data, operation: "fetchMyGroupChangeRequests")
+        return try MyHerzenBackendSystem.jsonDecoder.decode([GroupChangeRequestDTO].self, from: data)
+    }
+
+    func fetchModerationGroupChangeRequests(status: String = "pending") async throws -> [GroupChangeRequestDTO] {
+        let escapedStatus = status.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? status
+        let request = try makeAuthorizedMyHerzenRequest(path: "/moderation/group-change-requests?status=\(escapedStatus)")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data, operation: "fetchModerationGroupChangeRequests")
+        return try MyHerzenBackendSystem.jsonDecoder.decode([GroupChangeRequestDTO].self, from: data)
+    }
+
+    func approveGroupChangeRequest(id: String) async throws {
+        let escapedId = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        let request = try makeAuthorizedMyHerzenRequest(path: "/moderation/group-change-requests/\(escapedId)/approve", method: "POST")
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data, operation: "approveGroupChangeRequest")
+    }
+
+    func rejectGroupChangeRequest(id: String, comment: String?) async throws {
+        let payload = GroupChangeRequestReviewRequest(comment: comment)
+        let escapedId = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        var request = try makeAuthorizedMyHerzenRequest(path: "/moderation/group-change-requests/\(escapedId)/reject", method: "POST")
+        request.httpBody = try MyHerzenBackendSystem.jsonEncoder.encode(payload)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data, operation: "rejectGroupChangeRequest")
+    }
+
     private func decodeModerationRoleRequests(from data: Data) throws -> [RoleRequest] {
         let body = String(data: data, encoding: .utf8)?.myherzenTrimmed ?? ""
         guard !body.isEmpty, body != "null" else {

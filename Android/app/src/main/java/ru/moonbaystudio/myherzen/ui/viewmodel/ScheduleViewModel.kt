@@ -58,6 +58,7 @@ class ScheduleViewModel @Inject constructor(
     val homeworks: StateFlow<Map<String, Homework>> = _homeworks.asStateFlow()
 
     val currentUser = authRepository.currentUser
+    val defaultGroupId = settingsRepository.selectedGroupId
 
     val scheduleItems: StateFlow<List<ScheduleItem>> = combine(
         _groupId,
@@ -133,8 +134,7 @@ class ScheduleViewModel @Inject constructor(
                 repository.refreshScheduleRange(groupId, date, date, examOnly)
 
                 if (!examOnly) {
-                    val homeworkList = repository.getHomeworks(groupId, date)
-                    _homeworks.value = homeworkList.associateBy { homeworkKey(it.lessonDate, it.lessonTime, it.subject) }
+                    loadHomeworksForVisibleSchedule(date)
                 }
                 _refreshStatus.value = RefreshStatus.Success
                 _isOffline.value = false
@@ -234,8 +234,7 @@ class ScheduleViewModel @Inject constructor(
                     }
 
                     try {
-                        val homeworkList = repository.getHomeworks(groupId, date)
-                        _homeworks.value = homeworkList.associateBy { homeworkKey(it.lessonDate, it.lessonTime, it.subject) }
+                        loadHomeworksForVisibleSchedule(date)
                     } catch (e: Exception) {}
                 }
             } catch (e: Exception) {
@@ -277,8 +276,7 @@ class ScheduleViewModel @Inject constructor(
             try {
                 repository.refreshSchedule(groupId, date, examOnly)
                 if (!examOnly) {
-                    val homeworkList = repository.getHomeworks(groupId, date)
-                    _homeworks.value = homeworkList.associateBy { homeworkKey(it.lessonDate, it.lessonTime, it.subject) }
+                    loadHomeworksForVisibleSchedule(date)
                 } else {
                     _homeworks.value = emptyMap()
                 }
@@ -298,17 +296,21 @@ class ScheduleViewModel @Inject constructor(
     }
 
     fun saveHomework(lesson: ScheduleItem, text: String) {
-        val groupId = _groupId.value ?: return
+        _groupId.value ?: return
         val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(_selectedDate.value)
         val existing = _homeworks.value[homeworkKey(dateStr, lesson.time, lesson.title)]
 
         viewModelScope.launch {
             _isLoading.value = true
+            val homeworkGroupId = homeworkGroupIdForVisibleSchedule() ?: run {
+                _isLoading.value = false
+                return@launch
+            }
             val result = if (existing != null) {
-                repository.updateHomework(groupId, existing.id, text)
+                repository.updateHomework(homeworkGroupId, existing.id, text)
             } else {
                 repository.createHomework(
-                    groupId = groupId,
+                    groupId = homeworkGroupId,
                     lessonDate = dateStr,
                     lessonTime = lesson.time,
                     subject = lesson.title,
@@ -325,13 +327,34 @@ class ScheduleViewModel @Inject constructor(
     }
 
     fun deleteHomework(homeworkId: String) {
-        val groupId = _groupId.value ?: return
+        _groupId.value ?: return
         viewModelScope.launch {
             _isLoading.value = true
-            if (repository.deleteHomework(groupId, homeworkId).isSuccess) {
+            val homeworkGroupId = homeworkGroupIdForVisibleSchedule() ?: run {
+                _isLoading.value = false
+                return@launch
+            }
+            if (repository.deleteHomework(homeworkGroupId, homeworkId).isSuccess) {
                 refresh()
             }
             _isLoading.value = false
         }
+    }
+
+    private suspend fun loadHomeworksForVisibleSchedule(date: Date) {
+        val homeworkGroupId = homeworkGroupIdForVisibleSchedule()
+        if (homeworkGroupId == null) {
+            _homeworks.value = emptyMap()
+            return
+        }
+
+        val homeworkList = repository.getHomeworks(homeworkGroupId, date)
+        _homeworks.value = homeworkList.associateBy { homeworkKey(it.lessonDate, it.lessonTime, it.subject) }
+    }
+
+    private suspend fun homeworkGroupIdForVisibleSchedule(): Int? {
+        val scheduleGroupId = _groupId.value ?: return null
+        val defaultGroupId = settingsRepository.selectedGroupId.first() ?: return null
+        return defaultGroupId.takeIf { it == scheduleGroupId }
     }
 }

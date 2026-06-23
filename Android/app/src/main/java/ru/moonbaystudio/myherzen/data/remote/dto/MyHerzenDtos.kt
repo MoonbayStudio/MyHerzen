@@ -274,6 +274,33 @@ data class RoleRequest(
     @SerializedName("created_at") val createdAt: String
 )
 
+data class GroupChangeRequestCreateRequest(
+    @SerializedName("requestedGroupId") val requestedGroupId: Int,
+    @SerializedName("requestedGroupName") val requestedGroupName: String?,
+    val comment: String? = null
+)
+
+data class GroupChangeRequestReviewRequest(
+    val comment: String?
+)
+
+data class GroupChangeRequestDto(
+    val id: Int,
+    @SerializedName("userId") val userId: Int,
+    @SerializedName("userName") val userName: String?,
+    @SerializedName("userEmail") val userEmail: String?,
+    @SerializedName("currentGroupId") val currentGroupId: Int?,
+    @SerializedName("currentGroupName") val currentGroupName: String?,
+    @SerializedName("requestedGroupId") val requestedGroupId: Int,
+    @SerializedName("requestedGroupName") val requestedGroupName: String?,
+    val comment: String?,
+    val status: String,
+    @SerializedName("reviewedByAdminEmail") val reviewedByAdminEmail: String?,
+    @SerializedName("reviewComment") val reviewComment: String?,
+    @SerializedName("createdAt") val createdAt: String,
+    @SerializedName("reviewedAt") val reviewedAt: String?
+)
+
 data class GroupUserDto(
     val id: String,
     val email: String?,

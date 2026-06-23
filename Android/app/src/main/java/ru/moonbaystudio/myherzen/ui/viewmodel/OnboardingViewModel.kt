@@ -6,13 +6,16 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import ru.moonbaystudio.myherzen.data.local.preferences.UserPreferences
+import ru.moonbaystudio.myherzen.data.repository.AuthRepository
 import javax.inject.Inject
 
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _currentStep = MutableStateFlow(0)
@@ -30,6 +33,9 @@ class OnboardingViewModel @Inject constructor(
 
     fun completeOnboarding() {
         viewModelScope.launch {
+            if (authRepository.isLoggedIn.firstOrNull() == true) {
+                authRepository.pushLocalSettingsToAccount()
+            }
             userPreferences.setOnboardingCompleted(true)
         }
     }

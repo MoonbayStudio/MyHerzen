@@ -18,6 +18,8 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
     private val TOKEN_KEY = stringPreferencesKey("auth_token")
     private val GROUP_ID_KEY = intPreferencesKey("selected_group_id")
     private val GROUP_NAME_KEY = stringPreferencesKey("selected_group_name")
+    private val SCHEDULE_GROUP_ID_KEY = intPreferencesKey("schedule_group_id")
+    private val SCHEDULE_GROUP_NAME_KEY = stringPreferencesKey("schedule_group_name")
     private val THEME_ID_KEY = stringPreferencesKey("selected_theme_id")
     
     // Accessibility
@@ -39,6 +41,8 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
     val authToken: Flow<String?> = context.dataStore.data.map { it[TOKEN_KEY] }
     val selectedGroupId: Flow<Int?> = context.dataStore.data.map { it[GROUP_ID_KEY] }
     val selectedGroupName: Flow<String?> = context.dataStore.data.map { it[GROUP_NAME_KEY] }
+    val scheduleGroupId: Flow<Int?> = context.dataStore.data.map { it[SCHEDULE_GROUP_ID_KEY] ?: it[GROUP_ID_KEY] }
+    val scheduleGroupName: Flow<String?> = context.dataStore.data.map { it[SCHEDULE_GROUP_NAME_KEY] ?: it[GROUP_NAME_KEY] }
     val selectedThemeId: Flow<String> = context.dataStore.data.map { it[THEME_ID_KEY] ?: "classic" }
 
     val reduceMotion: Flow<Boolean> = context.dataStore.data.map { it[REDUCE_MOTION_KEY] ?: false }
@@ -74,6 +78,37 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
         context.dataStore.edit {
             it[GROUP_ID_KEY] = id
             it[GROUP_NAME_KEY] = name
+            if (!it.contains(SCHEDULE_GROUP_ID_KEY)) {
+                it[SCHEDULE_GROUP_ID_KEY] = id
+                it[SCHEDULE_GROUP_NAME_KEY] = name
+            }
+        }
+    }
+
+    suspend fun saveUserSettings(
+        selectedGroupId: Int?,
+        selectedGroupName: String?,
+        scheduleCacheWeeks: Int,
+        liveActivityEnabled: Boolean
+    ) {
+        context.dataStore.edit {
+            if (selectedGroupId != null) {
+                it[GROUP_ID_KEY] = selectedGroupId
+                it[GROUP_NAME_KEY] = selectedGroupName ?: selectedGroupId.toString()
+                if (!it.contains(SCHEDULE_GROUP_ID_KEY)) {
+                    it[SCHEDULE_GROUP_ID_KEY] = selectedGroupId
+                    it[SCHEDULE_GROUP_NAME_KEY] = selectedGroupName ?: selectedGroupId.toString()
+                }
+            }
+            it[SCHEDULE_CACHE_WEEKS_KEY] = scheduleCacheWeeks.coerceIn(0, 4)
+            it[LIVE_ACTIVITY_ENABLED_KEY] = liveActivityEnabled
+        }
+    }
+
+    suspend fun saveScheduleGroup(id: Int, name: String) {
+        context.dataStore.edit {
+            it[SCHEDULE_GROUP_ID_KEY] = id
+            it[SCHEDULE_GROUP_NAME_KEY] = name
         }
     }
 

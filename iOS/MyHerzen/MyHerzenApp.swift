@@ -62,6 +62,9 @@ struct MyHerzenApp: App {
     @AppStorage("useSystemTheme") private var useSystemTheme = true
     @AppStorage("isDarkMode") private var isDarkMode = false
     @AppStorage("selectedThemeID") private var selectedThemeID = AppThemeCatalog.default
+#if os(iOS)
+    @AppStorage("myherzenOnboardingCompleted") private var onboardingCompleted = false
+#endif
 
     var body: some Scene {
         WindowGroup {
@@ -73,8 +76,19 @@ struct MyHerzenApp: App {
                         }
                     }
                 } else {
+#if os(iOS)
+                    if onboardingCompleted {
+                        ContentView(viewModel: scheduleViewModel)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        MyHerzenOnboardingView(scheduleViewModel: scheduleViewModel) {
+                            onboardingCompleted = true
+                        }
+                    }
+#else
                     ContentView(viewModel: scheduleViewModel)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+#endif
                 }
             }
             .background(appThemeBackground)

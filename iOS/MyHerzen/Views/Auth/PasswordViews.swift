@@ -4,6 +4,7 @@ struct EmailPasswordLoginView: View {
     let activeTheme: AppTheme
     let isSigningIn: Bool
     let onLogin: (String, String) -> Void
+    var onSignupVerified: (() -> Void)? = nil
 
     @StateObject private var authSession = AuthSessionManager.shared
     @State private var mode: EmailAuthMode = .login
@@ -250,6 +251,7 @@ struct EmailPasswordLoginView: View {
                 authSession.updateCurrentUser(currentUser)
                 await UserSettingsSyncService.syncRemoteSettingsIfAuthenticated()
                 signupMessage = "Аккаунт подтверждён."
+                onSignupVerified?()
             } catch {
                 signupErrorMessage = signupVerificationErrorMessage(for: error)
             }

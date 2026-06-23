@@ -160,6 +160,7 @@
 				Views/Root/LaunchView.swift,
 				Views/Root/MenuDestinationView.swift,
 				Views/Root/MenuView.swift,
+				Views/Root/OnboardingView.swift,
 				Views/Root/RuntimeNoticeViews.swift,
 				Views/Root/SidebarView.swift,
 				Views/Root/ThemedChrome.swift,

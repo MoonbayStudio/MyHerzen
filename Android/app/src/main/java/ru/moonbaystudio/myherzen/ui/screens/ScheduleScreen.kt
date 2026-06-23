@@ -38,9 +38,17 @@ fun ScheduleScreen(
     val refreshStatus by viewModel.refreshStatus.collectAsState()
     val showLastDayWarning by viewModel.showLastDayWarning.collectAsState()
     val isOffline by viewModel.isOffline.collectAsState()
+    val defaultGroupId by viewModel.defaultGroupId.collectAsState(initial = -1)
+    val isViewingDefaultGroupSchedule = defaultGroupId == groupId
 
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedLessonForHomework by remember { mutableStateOf<ScheduleItem?>(null) }
+
+    LaunchedEffect(isViewingDefaultGroupSchedule) {
+        if (!isViewingDefaultGroupSchedule) {
+            selectedLessonForHomework = null
+        }
+    }
 
     LaunchedEffect(groupId) {
         viewModel.loadSchedule(groupId, false)
@@ -100,22 +108,25 @@ fun ScheduleScreen(
         selectedLessonForHomework?.let { lesson ->
             val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(selectedDate)
             val homework = homeworks["$dateStr|${lesson.time}|${lesson.title}"]
-            val canEdit = currentUser?.isAdmin == true || currentUser?.isModerator == true || currentUser?.isGroupLeader == true
+            val canEdit = isViewingDefaultGroupSchedule &&
+                (currentUser?.isAdmin == true || currentUser?.isModerator == true || currentUser?.isGroupLeader == true)
 
-            HomeworkDialog(
-                lesson = lesson,
-                homework = homework,
-                canEdit = canEdit,
-                onDismiss = { selectedLessonForHomework = null },
-                onSave = { text ->
-                    viewModel.saveHomework(lesson, text)
-                    selectedLessonForHomework = null
-                },
-                onDelete = {
-                    homework?.let { viewModel.deleteHomework(it.id) }
-                    selectedLessonForHomework = null
-                }
-            )
+            if (isViewingDefaultGroupSchedule) {
+                HomeworkDialog(
+                    lesson = lesson,
+                    homework = homework,
+                    canEdit = canEdit,
+                    onDismiss = { selectedLessonForHomework = null },
+                    onSave = { text ->
+                        viewModel.saveHomework(lesson, text)
+                        selectedLessonForHomework = null
+                    },
+                    onDelete = {
+                        homework?.let { viewModel.deleteHomework(it.id) }
+                        selectedLessonForHomework = null
+                    }
+                )
+            }
         }
 
         Box(modifier = Modifier.padding(padding).fillMaxSize()) {
@@ -138,11 +149,12 @@ fun ScheduleScreen(
                         items(items) { item ->
                             val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(selectedDate)
                             val homework = homeworks["$dateStr|${item.time}|${item.title}"]
-                            val canEdit = currentUser?.isAdmin == true || currentUser?.isModerator == true || currentUser?.isGroupLeader == true
+                            val canEdit = isViewingDefaultGroupSchedule &&
+                                (currentUser?.isAdmin == true || currentUser?.isModerator == true || currentUser?.isGroupLeader == true)
 
                             ScheduleItemCard(
                                 item = item,
-                                homework = homework,
+                                homework = if (isViewingDefaultGroupSchedule) homework else null,
                                 canEdit = canEdit,
                                 onHomeworkClick = { selectedLessonForHomework = item }
                             )

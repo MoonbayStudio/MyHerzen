@@ -20,20 +20,115 @@ import ru.moonbaystudio.myherzen.ui.components.ActionCapsule
 import ru.moonbaystudio.myherzen.ui.components.CapsuleHeader
 import ru.moonbaystudio.myherzen.ui.viewmodel.GroupSelectionViewModel
 
+enum class GroupSelectionWarning {
+    InitialDefaultGroup,
+    ChangeDefaultGroup
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GroupSelectionScreen(
     onGroupSelected: () -> Unit,
     onBack: (() -> Unit)? = null,
+    changesDefaultGroup: Boolean = false,
     viewModel: GroupSelectionViewModel = hiltViewModel()
 ) {
     val institutes by viewModel.institutes.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val selectionMessage by viewModel.selectionMessage.collectAsState()
+    val isSelectingGroup by viewModel.isSelectingGroup.collectAsState()
+    val defaultGroupId by viewModel.selectedGroupId.collectAsState(initial = null)
+    var pendingGroup by remember { mutableStateOf<MyGroup?>(null) }
+    var pendingWarning by remember { mutableStateOf<GroupSelectionWarning?>(null) }
+
+    fun applyGroupSelection(group: MyGroup) {
+        val groupId = group.id.toIntOrNull() ?: return
+        if (changesDefaultGroup) {
+            viewModel.selectDefaultGroup(groupId, group.name) {
+                onGroupSelected()
+            }
+        } else {
+            viewModel.selectGroup(groupId, group.name) {
+                onGroupSelected()
+            }
+        }
+    }
+
+    fun requestGroupSelection(group: MyGroup) {
+        val groupId = group.id.toIntOrNull() ?: return
+        val isFirstDefaultGroup = defaultGroupId == null
+        val changesExistingDefaultGroup = changesDefaultGroup && defaultGroupId != null && defaultGroupId != groupId
+
+        if (isFirstDefaultGroup) {
+            pendingGroup = group
+            pendingWarning = GroupSelectionWarning.InitialDefaultGroup
+            return
+        }
+        if (changesExistingDefaultGroup) {
+            pendingGroup = group
+            pendingWarning = GroupSelectionWarning.ChangeDefaultGroup
+            return
+        }
+
+        applyGroupSelection(group)
+    }
+
+    val warning = pendingWarning
+    if (warning != null) {
+        AlertDialog(
+            onDismissRequest = {
+                pendingGroup = null
+                pendingWarning = null
+            },
+            title = {
+                Text(
+                    if (warning == GroupSelectionWarning.InitialDefaultGroup) {
+                        "Группа по умолчанию"
+                    } else {
+                        "Смена группы по умолчанию"
+                    }
+                )
+            },
+            text = {
+                Text(
+                    if (warning == GroupSelectionWarning.InitialDefaultGroup) {
+                        "Эта группа будет привязана к аккаунту. По ней будут показываться домашка и участники. Позже сменить её можно будет только через заявку модератору."
+                    } else {
+                        "Группа не поменяется сразу. Мы создадим заявку для модератора, и после одобрения к новой группе будут привязаны домашка и участники."
+                    }
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val group = pendingGroup
+                        pendingGroup = null
+                        pendingWarning = null
+                        if (group != null) {
+                            applyGroupSelection(group)
+                        }
+                    }
+                ) {
+                    Text("Понял")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        pendingGroup = null
+                        pendingWarning = null
+                    }
+                ) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
             CapsuleHeader(
-                title = "Выбор группы",
+                title = if (changesDefaultGroup) "Группа по умолчанию" else "Выбор группы",
                 navigationIcon = if (onBack != null) {
                     { ActionCapsule(icon = Icons.Default.ArrowBack, onClick = onBack) }
                 } else null
@@ -45,10 +140,19 @@ fun GroupSelectionScreen(
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    if (selectionMessage != null || isSelectingGroup) {
+                        item {
+                            Text(
+                                text = selectionMessage ?: "Обновляем группу",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
                     items(institutes) { institute ->
-                        InstituteItem(institute) { group ->
-                            viewModel.selectGroup(group.id.toInt(), group.name)
-                            onGroupSelected()
+                        InstituteItem(institute, enabled = !isSelectingGroup) { group ->
+                            requestGroupSelection(group)
                         }
                     }
                 }
@@ -58,7 +162,7 @@ fun GroupSelectionScreen(
 }
 
 @Composable
-fun InstituteItem(institute: Institute, onGroupClick: (MyGroup) -> Unit) {
+fun InstituteItem(institute: Institute, enabled: Boolean = true, onGroupClick: (MyGroup) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
 
     Column {
@@ -78,7 +182,7 @@ fun InstituteItem(institute: Institute, onGroupClick: (MyGroup) -> Unit) {
                     headlineContent = { Text(group.name) },
                     modifier = Modifier
                         .padding(start = 16.dp)
-                        .clickable { onGroupClick(group) }
+                        .clickable(enabled = enabled) { onGroupClick(group) }
                 )
             }
         }

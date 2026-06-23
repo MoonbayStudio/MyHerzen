@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import ru.moonbaystudio.myherzen.data.model.Institute
+import ru.moonbaystudio.myherzen.data.repository.GroupSelectionResult
 import ru.moonbaystudio.myherzen.data.repository.ScheduleRepository
 import ru.moonbaystudio.myherzen.data.repository.SettingsRepository
 import javax.inject.Inject
@@ -23,6 +24,14 @@ class GroupSelectionViewModel @Inject constructor(
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _selectionMessage = MutableStateFlow<String?>(null)
+    val selectionMessage: StateFlow<String?> = _selectionMessage.asStateFlow()
+
+    private val _isSelectingGroup = MutableStateFlow(false)
+    val isSelectingGroup: StateFlow<Boolean> = _isSelectingGroup.asStateFlow()
+
+    val selectedGroupId = settingsRepository.selectedGroupId
 
     init {
         loadInstitutes()
@@ -41,9 +50,43 @@ class GroupSelectionViewModel @Inject constructor(
         }
     }
 
-    fun selectGroup(groupId: Int, groupName: String) {
+    fun selectGroup(groupId: Int, groupName: String, onApplied: () -> Unit = {}) {
         viewModelScope.launch {
-            settingsRepository.saveSelectedGroup(groupId, groupName)
+            _isSelectingGroup.value = true
+            _selectionMessage.value = null
+            when (val result = settingsRepository.selectScheduleGroup(groupId, groupName)) {
+                GroupSelectionResult.Applied -> {
+                    _selectionMessage.value = null
+                    onApplied()
+                }
+                GroupSelectionResult.ChangeRequestCreated -> {
+                    _selectionMessage.value = "Заявка на смену группы отправлена модератору."
+                }
+                is GroupSelectionResult.Error -> {
+                    _selectionMessage.value = result.message
+                }
+            }
+            _isSelectingGroup.value = false
+        }
+    }
+
+    fun selectDefaultGroup(groupId: Int, groupName: String, onApplied: () -> Unit = {}) {
+        viewModelScope.launch {
+            _isSelectingGroup.value = true
+            _selectionMessage.value = null
+            when (val result = settingsRepository.saveSelectedGroup(groupId, groupName)) {
+                GroupSelectionResult.Applied -> {
+                    _selectionMessage.value = null
+                    onApplied()
+                }
+                GroupSelectionResult.ChangeRequestCreated -> {
+                    _selectionMessage.value = "Заявка на смену группы по умолчанию отправлена модератору."
+                }
+                is GroupSelectionResult.Error -> {
+                    _selectionMessage.value = result.message
+                }
+            }
+            _isSelectingGroup.value = false
         }
     }
 }

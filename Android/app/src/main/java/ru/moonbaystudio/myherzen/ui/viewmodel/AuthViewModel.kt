@@ -43,7 +43,10 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             authRepository.isLoggedIn.collect { loggedIn ->
                 if (loggedIn) {
+                    _isLoading.value = true
                     authRepository.refreshUser()
+                    authRepository.syncLocalSelectedGroup()
+                    _isLoading.value = false
                 }
             }
         }

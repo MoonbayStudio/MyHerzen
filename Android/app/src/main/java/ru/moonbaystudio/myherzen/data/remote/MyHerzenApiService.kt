@@ -72,6 +72,12 @@ interface MyHerzenApiService {
     @GET("role-requests/me")
     suspend fun getMyRoleRequests(): Response<List<RoleRequest>>
 
+    @POST("group-change-requests")
+    suspend fun createGroupChangeRequest(@Body request: GroupChangeRequestCreateRequest): Response<GroupChangeRequestDto>
+
+    @GET("group-change-requests/me")
+    suspend fun getMyGroupChangeRequests(): Response<List<GroupChangeRequestDto>>
+
     @GET("groups/{groupId}/homeworks")
     suspend fun getGroupHomeworks(
         @Path("groupId") groupId: Int,
@@ -120,6 +126,18 @@ interface MyHerzenApiService {
 
     @POST("admin/role-requests/{requestId}/reject")
     suspend fun rejectRoleRequest(@Path("requestId") requestId: Int): Response<Unit>
+
+    @GET("moderation/group-change-requests")
+    suspend fun getGroupChangeRequests(@Query("status") status: String): Response<List<GroupChangeRequestDto>>
+
+    @POST("moderation/group-change-requests/{requestId}/approve")
+    suspend fun approveGroupChangeRequest(@Path("requestId") requestId: Int): Response<Unit>
+
+    @POST("moderation/group-change-requests/{requestId}/reject")
+    suspend fun rejectGroupChangeRequest(
+        @Path("requestId") requestId: Int,
+        @Body request: GroupChangeRequestReviewRequest
+    ): Response<Unit>
 
     @POST("admin/roles/grant")
     suspend fun grantRole(@Body request: GrantRoleRequest): Response<Unit>

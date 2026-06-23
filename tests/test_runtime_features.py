@@ -23,7 +23,7 @@ from app.main import (  # noqa: E402
     get_db,
 )
 from app.core.security import hash_password  # noqa: E402
-from app.db.models import AuthProvider, UserSettings  # noqa: E402
+from app.db.models import AuthProvider, GroupMembership, UserSettings  # noqa: E402
 from app.services.auth_service import (  # noqa: E402
     apply_apple_email_to_user,
     apply_google_email_to_user,
@@ -601,3 +601,243 @@ def test_moderation_can_approve_group_leader_role_request():
         UserRole.group_id == 202,
     ).first()
     assert granted_role is not None
+
+
+def test_group_users_include_selected_group_users_and_active_memberships():
+    db = TestingSessionLocal()
+
+    first_user = _create_user(
+        db,
+        email="first-group-user@example.com",
+        apple_sub="first-group-user-sub",
+    )
+    first_user.display_name = "First Group User"
+    second_user = _create_user(
+        db,
+        email="second-group-user@example.com",
+        apple_sub="second-group-user-sub",
+    )
+    second_user.display_name = "Second Group User"
+    membership_user = _create_user(
+        db,
+        email="membership-user@example.com",
+        apple_sub="membership-user-sub",
+    )
+    membership_user.display_name = "Membership User"
+    other_group_user = _create_user(
+        db,
+        email="other-group-user@example.com",
+        apple_sub="other-group-user-sub",
+    )
+    other_group_user.display_name = "Other Group User"
+
+    db.add_all(
+        [
+            UserSettings(
+                user_id=first_user.id,
+                selected_group_id=303,
+                selected_group_name="ИС-303",
+            ),
+            UserSettings(
+                user_id=second_user.id,
+                selected_group_id=303,
+                selected_group_name="ИС-303",
+            ),
+            UserSettings(
+                user_id=other_group_user.id,
+                selected_group_id=404,
+                selected_group_name="ИС-404",
+            ),
+            GroupMembership(
+                user_id=membership_user.id,
+                group_id=303,
+                role="member",
+                status="active",
+            ),
+        ]
+    )
+    db.commit()
+
+    response = client.get(
+        "/groups/303/users",
+        headers=_auth_headers_for_user(first_user.id),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    emails = {item["email"] for item in body}
+
+    assert emails == {
+        "first-group-user@example.com",
+        "second-group-user@example.com",
+        "membership-user@example.com",
+    }
+    assert {item["group_id"] for item in body} == {303}
+
+
+def test_group_users_rejects_user_from_different_selected_group():
+    db = TestingSessionLocal()
+
+    user = _create_user(
+        db,
+        email="wrong-group-user@example.com",
+        apple_sub="wrong-group-user-sub",
+    )
+    db.add(
+        UserSettings(
+            user_id=user.id,
+            selected_group_id=404,
+            selected_group_name="ИС-404",
+        )
+    )
+    db.commit()
+
+    response = client.get(
+        "/groups/303/users",
+        headers=_auth_headers_for_user(user.id),
+    )
+
+    assert response.status_code == 403
+
+
+def test_settings_rejects_direct_group_change_after_default_group_is_set():
+    db = TestingSessionLocal()
+
+    user = _create_user(
+        db,
+        email="direct-group-change@example.com",
+        apple_sub="direct-group-change-sub",
+    )
+    db.add(
+        UserSettings(
+            user_id=user.id,
+            selected_group_id=303,
+            selected_group_name="ИС-303",
+        )
+    )
+    db.commit()
+
+    response = client.put(
+        "/settings",
+        json={
+            "selectedGroupId": 404,
+            "selectedGroupName": "ИС-404",
+            "scheduleCacheWeeks": 2,
+            "liveActivityEnabled": True,
+        },
+        headers=_auth_headers_for_user(user.id),
+    )
+
+    assert response.status_code == 409
+    db.refresh(user)
+    settings = db.query(UserSettings).filter(UserSettings.user_id == user.id).first()
+    assert settings.selected_group_id == 303
+    assert settings.selected_group_name == "ИС-303"
+
+
+def test_group_change_request_moves_user_after_moderator_approval():
+    db = TestingSessionLocal()
+
+    requester = _create_user(
+        db,
+        email="group-change-requester@example.com",
+        apple_sub="group-change-requester-sub",
+    )
+    requester.display_name = "Group Change Requester"
+    moderator = _create_user(
+        db,
+        email="group-change-moderator@example.com",
+        apple_sub="group-change-moderator-sub",
+    )
+    db.add_all(
+        [
+            UserSettings(
+                user_id=requester.id,
+                selected_group_id=303,
+                selected_group_name="ИС-303",
+            ),
+            UserRole(user_id=moderator.id, role_type="moderator"),
+        ]
+    )
+    db.commit()
+
+    create_response = client.post(
+        "/group-change-requests",
+        json={
+            "requestedGroupId": 404,
+            "requestedGroupName": "ИС-404",
+            "comment": "Перевели в другую группу",
+        },
+        headers=_auth_headers_for_user(requester.id),
+    )
+
+    assert create_response.status_code == 200
+    request_body = create_response.json()
+    assert request_body["status"] == "pending"
+    assert request_body["currentGroupId"] == 303
+    assert request_body["requestedGroupId"] == 404
+
+    settings = db.query(UserSettings).filter(UserSettings.user_id == requester.id).first()
+    assert settings.selected_group_id == 303
+
+    moderation_response = client.get(
+        "/moderation/group-change-requests",
+        headers=_auth_headers_for_user(moderator.id),
+    )
+
+    assert moderation_response.status_code == 200
+    moderation_body = moderation_response.json()
+    assert len(moderation_body) == 1
+    assert moderation_body[0]["userEmail"] == "group-change-requester@example.com"
+
+    approve_response = client.post(
+        f"/moderation/group-change-requests/{request_body['id']}/approve",
+        headers=_auth_headers_for_user(moderator.id),
+    )
+
+    assert approve_response.status_code == 200
+    assert approve_response.json()["status"] == "approved"
+
+    db.refresh(settings)
+    assert settings.selected_group_id == 404
+    assert settings.selected_group_name == "ИС-404"
+
+    group_users_response = client.get(
+        "/groups/404/users",
+        headers=_auth_headers_for_user(requester.id),
+    )
+
+    assert group_users_response.status_code == 200
+    assert group_users_response.json()[0]["email"] == "group-change-requester@example.com"
+
+
+def test_group_change_request_rejects_duplicate_pending_request():
+    db = TestingSessionLocal()
+
+    user = _create_user(
+        db,
+        email="duplicate-group-change@example.com",
+        apple_sub="duplicate-group-change-sub",
+    )
+    db.add(
+        UserSettings(
+            user_id=user.id,
+            selected_group_id=303,
+            selected_group_name="ИС-303",
+        )
+    )
+    db.commit()
+
+    first_response = client.post(
+        "/group-change-requests",
+        json={"requestedGroupId": 404, "requestedGroupName": "ИС-404"},
+        headers=_auth_headers_for_user(user.id),
+    )
+    second_response = client.post(
+        "/group-change-requests",
+        json={"requestedGroupId": 505, "requestedGroupName": "ИС-505"},
+        headers=_auth_headers_for_user(user.id),
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 400

@@ -31,6 +31,7 @@ class GroupMembersViewModel @Inject constructor(
             val groupId = userPreferences.selectedGroupId.first()
             if (groupId != null) {
                 _isLoading.value = true
+                authRepository.syncLocalSelectedGroup()
                 _users.value = authRepository.getGroupUsers(groupId)
                 _isLoading.value = false
             } else {
@@ -42,6 +43,7 @@ class GroupMembersViewModel @Inject constructor(
     fun loadUsers(groupId: Int) {
         viewModelScope.launch {
             _isLoading.value = true
+            authRepository.syncLocalSelectedGroup()
             _users.value = authRepository.getGroupUsers(groupId)
             _isLoading.value = false
         }

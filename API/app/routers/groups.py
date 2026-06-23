@@ -3,18 +3,33 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime, timezone
 from app.db.session import get_db
-from app.db.models import User, GroupMembership, UserSettings, UserRole, GroupLeader, Homework
+from app.db.models import (
+    GroupChangeRequest,
+    GroupLeader,
+    GroupMembership,
+    Homework,
+    User,
+    UserRole,
+    UserSettings,
+)
 from app.core.features import require_homework_enabled
 from app.core.deps import (
     get_current_user, is_admin, is_moderator, can_access_group,
-    user_has_group_leader_role, ensure_group_access
+    user_has_group_leader_role, ensure_group_access,
+    ensure_admin_or_moderator, get_user_primary_email
 )
-from app.schemas.group import GroupInviteRequest
+from app.schemas.group import (
+    GroupChangeRequestCreate,
+    GroupChangeRequestResponse,
+    GroupChangeRequestReview,
+    GroupInviteRequest,
+)
 from app.schemas.homework import HomeworkCreateRequest, HomeworkOptionResponse, HomeworkUpdateRequest
 from app.services.assistant_policy_service import get_user_plan
 from app.services.homework_service import build_homework_options, homework_to_response
 from app.services.roles_service import build_user_roles
 from app.services.user_profile_service import build_user_badges
+from app.utils.common import normalize_optional_string
 from app.utils.email import normalize_email
 
 router = APIRouter()
@@ -58,6 +73,37 @@ def membership_to_response(m: GroupMembership):
         "created_at": m.created_at,
         "updated_at": m.updated_at
     }
+
+
+def group_change_request_to_response(
+    request: GroupChangeRequest,
+    target_user: Optional[User] = None,
+):
+    return {
+        "id": request.id,
+        "userId": request.user_id,
+        "userName": target_user.display_name if target_user is not None else None,
+        "userEmail": (
+            get_user_primary_email(target_user)
+            if target_user is not None
+            else request.user_email
+        ),
+        "currentGroupId": request.current_group_id,
+        "currentGroupName": request.current_group_name,
+        "requestedGroupId": request.requested_group_id,
+        "requestedGroupName": request.requested_group_name,
+        "comment": request.comment,
+        "status": request.status,
+        "moderatorId": request.moderator_id,
+        "reviewedByAdminEmail": request.reviewed_by_admin_email,
+        "reviewComment": request.review_comment,
+        "createdAt": request.created_at,
+        "reviewedAt": request.reviewed_at,
+    }
+
+
+def get_user_settings(db: Session, user_id: int) -> Optional[UserSettings]:
+    return db.query(UserSettings).filter(UserSettings.user_id == user_id).first()
 
 @router.get("/groups/{group_id}/members")
 def get_group_members(
@@ -235,6 +281,193 @@ def decline_invite(
     db.refresh(m)
     return membership_to_response(m)
 
+
+@router.post(
+    "/group-change-requests",
+    response_model=GroupChangeRequestResponse,
+)
+def create_group_change_request(
+    data: GroupChangeRequestCreate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    settings = get_user_settings(db=db, user_id=user.id)
+    if settings is None or settings.selected_group_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Set the initial default group through settings first",
+        )
+
+    requested_group_name = normalize_optional_string(data.requestedGroupName)
+    current_group_name = normalize_optional_string(settings.selected_group_name)
+
+    if settings.selected_group_id == data.requestedGroupId:
+        if requested_group_name is None or requested_group_name == current_group_name:
+            raise HTTPException(status_code=400, detail="This group is already selected")
+
+    existing_pending = db.query(GroupChangeRequest).filter(
+        GroupChangeRequest.user_id == user.id,
+        GroupChangeRequest.status == "pending",
+    ).first()
+    if existing_pending is not None:
+        raise HTTPException(status_code=400, detail="Pending group change request already exists")
+
+    request = GroupChangeRequest(
+        user_id=user.id,
+        user_email=get_user_primary_email(user),
+        current_group_id=settings.selected_group_id,
+        current_group_name=current_group_name,
+        requested_group_id=data.requestedGroupId,
+        requested_group_name=requested_group_name,
+        comment=normalize_optional_string(data.comment),
+        status="pending",
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+    return group_change_request_to_response(request=request, target_user=user)
+
+
+@router.get(
+    "/group-change-requests/me",
+    response_model=list[GroupChangeRequestResponse],
+)
+def get_my_group_change_requests(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    requests = db.query(GroupChangeRequest).filter(
+        GroupChangeRequest.user_id == user.id
+    ).order_by(
+        GroupChangeRequest.created_at.desc(),
+        GroupChangeRequest.id.desc(),
+    ).all()
+
+    return [
+        group_change_request_to_response(request=request, target_user=user)
+        for request in requests
+    ]
+
+
+@router.get(
+    "/moderation/group-change-requests",
+    response_model=list[GroupChangeRequestResponse],
+)
+def get_moderation_group_change_requests(
+    status: str = Query(default="pending"),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    ensure_admin_or_moderator(db=db, user=user)
+
+    allowed_statuses = {"pending", "approved", "rejected", "all"}
+    normalized_status = status.strip().lower()
+    if normalized_status not in allowed_statuses:
+        raise HTTPException(status_code=400, detail="Invalid status filter")
+
+    query = db.query(GroupChangeRequest)
+    if normalized_status != "all":
+        query = query.filter(GroupChangeRequest.status == normalized_status)
+
+    requests = query.order_by(
+        GroupChangeRequest.created_at.desc(),
+        GroupChangeRequest.id.desc(),
+    ).all()
+
+    if not requests:
+        return []
+
+    users_by_id = {
+        target.id: target
+        for target in db.query(User).filter(
+            User.id.in_({request.user_id for request in requests})
+        ).all()
+    }
+
+    return [
+        group_change_request_to_response(
+            request=request,
+            target_user=users_by_id.get(request.user_id),
+        )
+        for request in requests
+    ]
+
+
+@router.post(
+    "/moderation/group-change-requests/{request_id}/approve",
+    response_model=GroupChangeRequestResponse,
+)
+def approve_group_change_request(
+    request_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    ensure_admin_or_moderator(db=db, user=user)
+
+    request = db.query(GroupChangeRequest).filter(
+        GroupChangeRequest.id == request_id,
+        GroupChangeRequest.status == "pending",
+    ).first()
+    if request is None:
+        raise HTTPException(status_code=404, detail="Pending group change request not found")
+
+    target_user = db.query(User).filter(User.id == request.user_id).first()
+    if target_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    settings = get_user_settings(db=db, user_id=request.user_id)
+    if settings is None:
+        settings = UserSettings(user_id=request.user_id)
+        db.add(settings)
+
+    settings.selected_group_id = request.requested_group_id
+    settings.selected_group_name = request.requested_group_name
+    settings.updated_at = datetime.now(timezone.utc)
+
+    request.status = "approved"
+    request.moderator_id = user.id
+    request.reviewed_by_admin_email = get_user_primary_email(user)
+    request.reviewed_at = datetime.now(timezone.utc)
+
+    db.commit()
+    db.refresh(request)
+    return group_change_request_to_response(request=request, target_user=target_user)
+
+
+@router.post(
+    "/moderation/group-change-requests/{request_id}/reject",
+    response_model=GroupChangeRequestResponse,
+)
+def reject_group_change_request(
+    request_id: int,
+    data: Optional[GroupChangeRequestReview] = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    ensure_admin_or_moderator(db=db, user=user)
+
+    request = db.query(GroupChangeRequest).filter(
+        GroupChangeRequest.id == request_id,
+        GroupChangeRequest.status == "pending",
+    ).first()
+    if request is None:
+        raise HTTPException(status_code=404, detail="Pending group change request not found")
+
+    target_user = db.query(User).filter(User.id == request.user_id).first()
+    review_data = data or GroupChangeRequestReview()
+
+    request.status = "rejected"
+    request.moderator_id = user.id
+    request.reviewed_by_admin_email = get_user_primary_email(user)
+    request.review_comment = normalize_optional_string(review_data.comment)
+    request.reviewed_at = datetime.now(timezone.utc)
+
+    db.commit()
+    db.refresh(request)
+    return group_change_request_to_response(request=request, target_user=target_user)
+
+
 @router.get("/groups/{group_id}/users")
 def get_group_users(
     group_id: int,
@@ -247,8 +480,13 @@ def get_group_users(
         GroupMembership.group_id == group_id,
         GroupMembership.status == "active"
     ).all()
-    
+
+    selected_group_settings = db.query(UserSettings).filter(
+        UserSettings.selected_group_id == group_id
+    ).all()
+
     group_user_ids = {m.user_id for m in memberships}
+    group_user_ids.update(settings.user_id for settings in selected_group_settings)
     if not group_user_ids:
         return []
         

@@ -34,6 +34,7 @@ class AuthRepository @Inject constructor(
         return safeApiCall { apiService.login(request) }.toResult().map { body ->
             userPreferences.saveAuthToken(body.token)
             _currentUser.value = body.user
+            syncLocalSelectedGroup()
             Unit
         }
     }
@@ -59,6 +60,7 @@ class AuthRepository @Inject constructor(
         return safeApiCall { apiService.signupVerify(request) }.toResult().map { body ->
             userPreferences.saveAuthToken(body.token)
             _currentUser.value = body.user
+            syncLocalSelectedGroup()
             Unit
         }
     }
@@ -75,6 +77,7 @@ class AuthRepository @Inject constructor(
         return safeApiCall { apiService.googleLogin(request) }.toResult().map { body ->
             userPreferences.saveAuthToken(body.token)
             _currentUser.value = body.user
+            syncLocalSelectedGroup()
             Unit
         }
     }
@@ -168,12 +171,26 @@ class AuthRepository @Inject constructor(
         return safeApiCall { apiService.getAdminRoleRequests(status) }.getOrElse { emptyList() }
     }
 
+    suspend fun getGroupChangeRequests(status: String): List<GroupChangeRequestDto> {
+        return safeApiCall { apiService.getGroupChangeRequests(status) }.getOrElse { emptyList() }
+    }
+
     suspend fun approveRoleRequest(requestId: Int): Result<Unit> {
         return safeApiCall { apiService.approveRoleRequest(requestId) }.toResult().map { Unit }
     }
 
     suspend fun rejectRoleRequest(requestId: Int): Result<Unit> {
         return safeApiCall { apiService.rejectRoleRequest(requestId) }.toResult().map { Unit }
+    }
+
+    suspend fun approveGroupChangeRequest(requestId: Int): Result<Unit> {
+        return safeApiCall { apiService.approveGroupChangeRequest(requestId) }.toResult().map { Unit }
+    }
+
+    suspend fun rejectGroupChangeRequest(requestId: Int, comment: String? = null): Result<Unit> {
+        return safeApiCall {
+            apiService.rejectGroupChangeRequest(requestId, GroupChangeRequestReviewRequest(comment))
+        }.toResult().map { Unit }
     }
 
     suspend fun grantRole(userId: String, role: String): Result<Unit> {
@@ -242,5 +259,70 @@ class AuthRepository @Inject constructor(
 
     suspend fun confirmPasswordReset(code: String, newPassword: String): Result<Unit> {
         return safeApiCall { apiService.confirmPasswordReset(ResetPasswordConfirmRequest(code, newPassword)) }.toResult().map { Unit }
+    }
+
+    suspend fun syncLocalSelectedGroup() {
+        val remoteSettings = when (val result = safeApiCall { apiService.getSettings() }) {
+            is NetworkResult.Success -> result.data
+            else -> null
+        }
+
+        if (remoteSettings?.selectedGroupId != null) {
+            userPreferences.saveUserSettings(
+                selectedGroupId = remoteSettings.selectedGroupId,
+                selectedGroupName = remoteSettings.selectedGroupName,
+                scheduleCacheWeeks = remoteSettings.scheduleCacheWeeks,
+                liveActivityEnabled = remoteSettings.liveActivityEnabled
+            )
+            return
+        }
+
+        val groupId = userPreferences.selectedGroupId.first() ?: run {
+            if (remoteSettings != null) {
+                userPreferences.saveUserSettings(
+                    selectedGroupId = null,
+                    selectedGroupName = null,
+                    scheduleCacheWeeks = remoteSettings.scheduleCacheWeeks,
+                    liveActivityEnabled = remoteSettings.liveActivityEnabled
+                )
+            }
+            return
+        }
+        val groupName = userPreferences.selectedGroupName.first() ?: groupId.toString()
+        val settings = UserSettings(
+            selectedGroupId = groupId,
+            selectedGroupName = groupName,
+            scheduleCacheWeeks = remoteSettings?.scheduleCacheWeeks ?: userPreferences.scheduleCacheWeeks.first(),
+            liveActivityEnabled = remoteSettings?.liveActivityEnabled ?: userPreferences.liveActivityEnabled.first()
+        )
+        safeApiCall { apiService.updateSettings(settings) }
+    }
+
+    suspend fun pushLocalSettingsToAccount(): Result<Unit> {
+        val groupId = userPreferences.selectedGroupId.first()
+            ?: return Result.failure(IllegalStateException("Default group is not selected"))
+        val groupName = userPreferences.selectedGroupName.first() ?: groupId.toString()
+        val remoteSettings = when (val result = safeApiCall { apiService.getSettings() }) {
+            is NetworkResult.Success -> result.data
+            else -> null
+        }
+
+        if (remoteSettings?.selectedGroupId != null && remoteSettings.selectedGroupId != groupId) {
+            userPreferences.saveUserSettings(
+                selectedGroupId = remoteSettings.selectedGroupId,
+                selectedGroupName = remoteSettings.selectedGroupName,
+                scheduleCacheWeeks = remoteSettings.scheduleCacheWeeks,
+                liveActivityEnabled = remoteSettings.liveActivityEnabled
+            )
+            return Result.failure(IllegalStateException("Remote default group differs from local group"))
+        }
+
+        val settings = UserSettings(
+            selectedGroupId = groupId,
+            selectedGroupName = groupName,
+            scheduleCacheWeeks = userPreferences.scheduleCacheWeeks.first(),
+            liveActivityEnabled = userPreferences.liveActivityEnabled.first()
+        )
+        return safeApiCall { apiService.updateSettings(settings) }.toResult().map { Unit }
     }
 }

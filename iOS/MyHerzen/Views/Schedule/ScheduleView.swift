@@ -57,6 +57,7 @@ enum HomeworkButtonState: Equatable {
 
 struct ScheduleView: View {
     @AppStorage("selectedThemeID") private var selectedThemeID = AppThemeCatalog.default
+    @AppStorage("selectedGroupId") private var defaultGroupId = ""
     @Environment(\.myherzenSurfaceStrokeOpacity) private var strokeOpacity
     @StateObject private var authSession = AuthSessionManager.shared
     @ObservedObject var viewModel: ScheduleViewModel
@@ -136,12 +137,26 @@ struct ScheduleView: View {
         Int(groupId)
     }
 
+    private var homeworkGroupId: Int? {
+        Int(defaultGroupId.myherzenTrimmed) ?? currentGroupId
+    }
+
+    private var isViewingDefaultGroupSchedule: Bool {
+        guard let currentGroupId else { return false }
+        guard let defaultGroupId = Int(defaultGroupId.myherzenTrimmed) else { return false }
+        return currentGroupId == defaultGroupId
+    }
+
+    private var shouldShowHomeworkControls: Bool {
+        !examOnly && isViewingDefaultGroupSchedule
+    }
+
     private var selectedLessonDateString: String {
         Self.homeworkDateFormatter.string(from: selectedDate)
     }
 
     private var canManageHomeworkForSelectedGroup: Bool {
-        guard !examOnly, let currentUser = authSession.currentUser else { return false }
+        guard shouldShowHomeworkControls, let currentUser = authSession.currentUser else { return false }
         return currentUser.isAdmin || currentUser.isModerator || currentUser.isGroupLeader
     }
 
@@ -342,6 +357,18 @@ struct ScheduleView: View {
                 await loadHomeworksForSelectedDate()
             }
         }
+        .onChange(of: groupId) { _ in
+            selectedHomeworkSheet = nil
+            Task {
+                await loadHomeworksForSelectedDate()
+            }
+        }
+        .onChange(of: defaultGroupId) { _ in
+            selectedHomeworkSheet = nil
+            Task {
+                await loadHomeworksForSelectedDate()
+            }
+        }
         .onAppear {
             guard !groupId.isEmpty else { return }
             Task {
@@ -473,6 +500,18 @@ struct ScheduleView: View {
         }
     }
     .onChange(of: selectedDate) { _ in
+        Task {
+            await loadHomeworksForSelectedDate()
+        }
+    }
+    .onChange(of: groupId) { _ in
+        selectedHomeworkSheet = nil
+        Task {
+            await loadHomeworksForSelectedDate()
+        }
+    }
+    .onChange(of: defaultGroupId) { _ in
+        selectedHomeworkSheet = nil
         Task {
             await loadHomeworksForSelectedDate()
         }
@@ -648,7 +687,7 @@ struct ScheduleView: View {
 #endif
 
     private func homeworkButtonState(for item: ScheduleItem) -> HomeworkButtonState {
-        guard !examOnly else { return .hidden }
+        guard shouldShowHomeworkControls else { return .hidden }
         let homework = homework(for: item)
         if homework != nil {
             return canManageHomeworkForSelectedGroup ? .edit : .view
@@ -706,6 +745,7 @@ struct ScheduleView: View {
     }
 
     private func openHomeworkSheet(for item: ScheduleItem) {
+        guard shouldShowHomeworkControls else { return }
         let homework = homework(for: item)
         guard canManageHomeworkForSelectedGroup || homework != nil else {
             homeworkErrorMessage = "Домашки для этой пары пока нет."
@@ -724,7 +764,12 @@ struct ScheduleView: View {
     }
 
     private func loadHomeworksForSelectedDate() async {
-        guard !examOnly, let groupId = currentGroupId else { return }
+        guard shouldShowHomeworkControls else {
+            homeworksByLessonKey = [:]
+            homeworkErrorMessage = nil
+            return
+        }
+        guard let groupId = homeworkGroupId else { return }
         do {
             let homeworks = try await APIService.shared.fetchGroupHomeworks(groupId: groupId, date: selectedLessonDateString)
             homeworksByLessonKey = Dictionary(uniqueKeysWithValues: homeworks.map {
@@ -737,7 +782,7 @@ struct ScheduleView: View {
     }
 
     private func saveHomework(for lesson: ScheduleItem, existing: Homework?, text: String) async throws -> Homework {
-        guard let groupId = currentGroupId else {
+        guard let groupId = homeworkGroupId else {
             throw APIServiceError.invalidURL
         }
         let homework: Homework
@@ -760,7 +805,7 @@ struct ScheduleView: View {
     }
 
     private func deleteHomework(_ homework: Homework) async throws {
-        guard let groupId = currentGroupId else {
+        guard let groupId = homeworkGroupId else {
             throw APIServiceError.invalidURL
         }
         try await APIService.shared.deleteHomework(groupId: groupId, homeworkId: homework.id)

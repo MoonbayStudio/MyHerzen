@@ -1537,16 +1537,32 @@ struct AccountView: View {
                 let updatedUser = try await APIService.shared.updateProfile(name: trimmedName)
                 authSession.updateCurrentUser(updatedUser)
 
+                var shouldCloseProfile = true
                 if let parsedGroupId,
                    trimmedGroupId != selectedGroupId || trimmedGroupName != selectedGroupName {
-                    let settings = try await APIService.shared.updateSettings(
-                        selectedGroupId: parsedGroupId,
-                        selectedGroupName: trimmedGroupName.isEmpty ? trimmedGroupId : trimmedGroupName
+                    let requestedGroupName = trimmedGroupName.isEmpty ? trimmedGroupId : trimmedGroupName
+                    let groupUpdateResult = await UserSettingsSyncService.updateRemoteSelectedGroupIfAuthenticated(
+                        MyGroup(id: String(parsedGroupId), name: requestedGroupName)
                     )
-                    UserSettingsSyncService.apply(settings)
+                    switch groupUpdateResult {
+                    case .applied:
+                        break
+                    case .changeRequestCreated:
+                        profileErrorMessage = "Заявка на смену группы отправлена модератору."
+                        shouldCloseProfile = false
+                    case .authenticationRequired:
+                        profileErrorMessage = "Чтобы сменить группу, войдите в аккаунт."
+                        shouldCloseProfile = false
+                    case .failed:
+                        profileErrorMessage = "Не удалось отправить заявку на смену группы."
+                        showsProfileSaveError = true
+                        shouldCloseProfile = false
+                    }
                 }
 
-                resetAccountScreen()
+                if shouldCloseProfile {
+                    resetAccountScreen()
+                }
             } catch {
                 print("[AccountView] Profile update failed: \(error)")
                 if case APIServiceError.httpStatus(401) = error {
@@ -1856,6 +1872,38 @@ private struct ProfileEditorView: View {
     let onOpenMyRoleRequests: () -> Void
     let onSave: (String, String, String) -> Void
 
+    private enum ProfileSaveWarning: Identifiable {
+        case initialGroupBinding
+        case groupChangeRequest
+
+        var id: String {
+            switch self {
+            case .initialGroupBinding:
+                return "initialGroupBinding"
+            case .groupChangeRequest:
+                return "groupChangeRequest"
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .initialGroupBinding:
+                return "Группа по умолчанию"
+            case .groupChangeRequest:
+                return "Смена группы по умолчанию"
+            }
+        }
+
+        var message: String {
+            switch self {
+            case .initialGroupBinding:
+                return "Эта группа будет привязана к аккаунту. По ней будут показываться домашка и участники. Позже сменить её можно будет только через заявку модератору."
+            case .groupChangeRequest:
+                return "Группа не поменяется сразу. Мы создадим заявку для модератора, и после одобрения к новой группе будут привязаны домашка и участники."
+            }
+        }
+    }
+
     @State private var displayName: String
     @State private var groupId: String
     @State private var groupName: String
@@ -1864,6 +1912,7 @@ private struct ProfileEditorView: View {
     @State private var isNameEditorExpanded = false
     @State private var isGroupPickerExpanded = false
     @State private var isLoadingGroups = false
+    @State private var profileSaveWarning: ProfileSaveWarning?
     @Environment(\.myherzenSurfaceStrokeOpacity) private var strokeOpacity
 
     init(
@@ -1931,6 +1980,18 @@ private struct ProfileEditorView: View {
 
     private var canSave: Bool {
         validationMessage == nil && !trimmedName.isEmpty && !isSaving
+    }
+
+    private var normalizedInitialGroupId: String {
+        initialGroupId.myherzenTrimmed
+    }
+
+    private var shouldWarnInitialGroupBinding: Bool {
+        normalizedInitialGroupId.isEmpty && !trimmedGroupId.isEmpty
+    }
+
+    private var shouldWarnGroupChangeRequest: Bool {
+        !normalizedInitialGroupId.isEmpty && !trimmedGroupId.isEmpty && trimmedGroupId != normalizedInitialGroupId
     }
 
     private var profileSurfaceFill: Color {
@@ -2059,6 +2120,19 @@ private struct ProfileEditorView: View {
         .myherzenTask {
             await loadGroupsIfNeeded()
         }
+        .alert(item: $profileSaveWarning) { warning in
+            Alert(
+                title: Text(warning.title),
+                message: Text(warning.message),
+                primaryButton: .default(Text("Понял")) {
+                    profileSaveWarning = nil
+                    submitProfile()
+                },
+                secondaryButton: .cancel(Text("Отмена")) {
+                    profileSaveWarning = nil
+                }
+            )
+        }
 #if os(iOS)
         .navigationBarBackButtonHidden(true)
         .navigationBarHidden(true)
@@ -2133,7 +2207,7 @@ private struct ProfileEditorView: View {
                 }
             }
 
-            Text("Используется для расписания и синхронизируется с backend.")
+            Text("Используется для домашки и участников группы.")
                 .font(.caption2)
                 .foregroundColor(.secondary)
         }
@@ -2316,7 +2390,7 @@ private struct ProfileEditorView: View {
 
     private var saveButton: some View {
         Button {
-            onSave(trimmedName, trimmedGroupId, trimmedGroupName)
+            handleSaveTap()
         } label: {
             HStack(spacing: 8) {
                 Spacer(minLength: 0)
@@ -2341,6 +2415,22 @@ private struct ProfileEditorView: View {
         .buttonStyle(.plain)
         .disabled(!canSave)
         .opacity(canSave ? 1 : 0.55)
+    }
+
+    private func handleSaveTap() {
+        if shouldWarnInitialGroupBinding {
+            profileSaveWarning = .initialGroupBinding
+            return
+        }
+        if shouldWarnGroupChangeRequest {
+            profileSaveWarning = .groupChangeRequest
+            return
+        }
+        submitProfile()
+    }
+
+    private func submitProfile() {
+        onSave(trimmedName, trimmedGroupId, trimmedGroupName)
     }
 
     private func loadGroupsIfNeeded() async {

@@ -522,6 +522,7 @@ struct ModerationRoleRequestsView: View {
     var toolbarRefreshRequest: Binding<Int>? = nil
     @StateObject private var authSession = AuthSessionManager.shared
     @State private var requests: [RoleRequest] = []
+    @State private var groupChangeRequests: [GroupChangeRequestDTO] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var processingRequestId: String?
@@ -539,6 +540,10 @@ struct ModerationRoleRequestsView: View {
         requests.filter { $0.status.lowercased() == "pending" }
     }
 
+    private var pendingGroupChangeRequests: [GroupChangeRequestDTO] {
+        groupChangeRequests.filter { $0.status.lowercased() == "pending" }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             header
@@ -550,11 +555,14 @@ struct ModerationRoleRequestsView: View {
             } else if let errorMessage, requests.isEmpty {
                 stateCard(systemImage: "exclamationmark.triangle.fill", title: errorMessage, subtitle: nil)
                 retryButton
-            } else if pendingRequests.isEmpty {
+            } else if pendingRequests.isEmpty && pendingGroupChangeRequests.isEmpty {
                 stateCard(systemImage: "checkmark.seal.fill", title: "Нет заявок на проверку", subtitle: nil)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 12) {
+                        ForEach(pendingGroupChangeRequests) { request in
+                            groupChangeModerationCard(for: request)
+                        }
                         ForEach(pendingRequests) { request in
                             moderationCard(for: request)
                         }
@@ -725,6 +733,79 @@ struct ModerationRoleRequestsView: View {
         .myherzenDefaultSurface()
     }
 
+    private func groupChangeModerationCard(for request: GroupChangeRequestDTO) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "person.3.fill")
+                    .foregroundColor(.accentColor)
+                    .frame(width: 24)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(request.userName?.myherzenTrimmed.isEmpty == false ? request.userName ?? request.userId : request.userId)
+                        .font(.subheadline.weight(.semibold))
+                    if let email = request.userEmail, !email.myherzenTrimmed.isEmpty {
+                        Text(email)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                Text("Смена группы")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.secondary)
+            }
+
+            Label(groupChangeText(for: request), systemImage: "arrow.right.circle.fill")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            if let comment = request.comment, !comment.myherzenTrimmed.isEmpty {
+                Text(comment)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Text(displayDate(from: request.createdAt))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+
+            TextField("Комментарий к отказу", text: rejectionCommentBinding(for: "group-\(request.id)"))
+                .textFieldStyle(.roundedBorder)
+                .disabled(processingRequestId != nil)
+
+            HStack(spacing: 10) {
+                Button {
+                    approveGroupChange(request)
+                } label: {
+                    Label("Одобрить", systemImage: "checkmark.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .disabled(processingRequestId != nil)
+
+                Button {
+                    rejectGroupChange(request)
+                } label: {
+                    Label("Отклонить", systemImage: "xmark.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .disabled(processingRequestId != nil)
+            }
+            .buttonStyle(.bordered)
+
+            if processingRequestId == "group-\(request.id)" {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    Text("Обновляем заявку")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .myherzenDefaultSurface()
+    }
+
     private func loadRequestsIfNeeded() async {
         guard requests.isEmpty, !isLoading, canModerateRoles else { return }
         await loadRequests()
@@ -735,9 +816,13 @@ struct ModerationRoleRequestsView: View {
         isLoading = true
         errorMessage = nil
         do {
-            let loaded = try await APIService.shared.fetchModerationRoleRequests()
+            async let roleRequests = APIService.shared.fetchModerationRoleRequests()
+            async let groupRequests = APIService.shared.fetchModerationGroupChangeRequests()
+            let loadedRoles = try await roleRequests
+            let loadedGroups = try await groupRequests
             withAnimation(.easeInOut(duration: 0.2)) {
-                requests = loaded
+                requests = loadedRoles
+                groupChangeRequests = loadedGroups
             }
         } catch {
             print("[ModerationRoleRequestsView] failed to load role requests: \(error)")
@@ -762,6 +847,22 @@ struct ModerationRoleRequestsView: View {
         }
     }
 
+    private func approveGroupChange(_ request: GroupChangeRequestDTO) {
+        processGroupChange(request) {
+            try await APIService.shared.approveGroupChangeRequest(id: request.id)
+        }
+    }
+
+    private func rejectGroupChange(_ request: GroupChangeRequestDTO) {
+        let comment = rejectionCommentById["group-\(request.id)"]?.myherzenTrimmed
+        processGroupChange(request) {
+            try await APIService.shared.rejectGroupChangeRequest(
+                id: request.id,
+                comment: comment?.isEmpty == false ? comment : nil
+            )
+        }
+    }
+
     private func process(_ request: RoleRequest, action: @escaping () async throws -> Void) {
         guard processingRequestId == nil else { return }
         processingRequestId = request.id
@@ -772,6 +873,22 @@ struct ModerationRoleRequestsView: View {
                 await loadRequests()
             } catch {
                 print("[ModerationRoleRequestsView] failed to process role request: \(error)")
+                errorMessage = "Не удалось обновить заявку."
+            }
+            processingRequestId = nil
+        }
+    }
+
+    private func processGroupChange(_ request: GroupChangeRequestDTO, action: @escaping () async throws -> Void) {
+        guard processingRequestId == nil else { return }
+        processingRequestId = "group-\(request.id)"
+        errorMessage = nil
+        Task {
+            do {
+                try await action()
+                await loadRequests()
+            } catch {
+                print("[ModerationRoleRequestsView] failed to process group change request: \(error)")
                 errorMessage = "Не удалось обновить заявку."
             }
             processingRequestId = nil
@@ -793,6 +910,16 @@ struct ModerationRoleRequestsView: View {
             return "Группа \(groupId)"
         }
         return nil
+    }
+
+    private func groupChangeText(for request: GroupChangeRequestDTO) -> String {
+        let current = request.currentGroupName?.myherzenTrimmed.isEmpty == false
+            ? request.currentGroupName ?? ""
+            : request.currentGroupId.map { "Группа \($0)" } ?? "Группа не выбрана"
+        let requested = request.requestedGroupName?.myherzenTrimmed.isEmpty == false
+            ? request.requestedGroupName ?? ""
+            : "Группа \(request.requestedGroupId)"
+        return "\(current) -> \(requested)"
     }
 
     private func roleTitle(for roleType: String) -> String {

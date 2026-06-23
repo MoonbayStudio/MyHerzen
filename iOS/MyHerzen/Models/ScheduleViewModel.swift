@@ -78,8 +78,8 @@ final class ScheduleViewModel: ObservableObject {
     private var activityTicker: AnyCancellable?
     @Published var savedGroupId: String {
         didSet {
-            UserDefaults.standard.set(savedGroupId, forKey: "selectedGroupId")
-            UserDefaults(suiteName: appGroupID)?.set(savedGroupId, forKey: "selectedGroupId")
+            UserDefaults.standard.set(savedGroupId, forKey: "scheduleGroupId")
+            UserDefaults(suiteName: appGroupID)?.set(savedGroupId, forKey: "scheduleGroupId")
         }
     }
 
@@ -187,11 +187,18 @@ final class ScheduleViewModel: ObservableObject {
     }
 
     init() {
-        let sharedGroupValue = UserDefaults(suiteName: appGroupID)?.string(forKey: "selectedGroupId")
-        self.savedGroupId = sharedGroupValue ?? UserDefaults.standard.string(forKey: "selectedGroupId") ?? ""
+        let sharedScheduleGroupValue = UserDefaults(suiteName: appGroupID)?.string(forKey: "scheduleGroupId")
+        let localScheduleGroupValue = UserDefaults.standard.string(forKey: "scheduleGroupId")
+        let sharedDefaultGroupValue = UserDefaults(suiteName: appGroupID)?.string(forKey: "selectedGroupId")
+        let localDefaultGroupValue = UserDefaults.standard.string(forKey: "selectedGroupId")
+        self.savedGroupId = sharedScheduleGroupValue
+            ?? localScheduleGroupValue
+            ?? sharedDefaultGroupValue
+            ?? localDefaultGroupValue
+            ?? ""
         if !savedGroupId.isEmpty {
-            UserDefaults.standard.set(savedGroupId, forKey: "selectedGroupId")
-            UserDefaults(suiteName: appGroupID)?.set(savedGroupId, forKey: "selectedGroupId")
+            UserDefaults.standard.set(savedGroupId, forKey: "scheduleGroupId")
+            UserDefaults(suiteName: appGroupID)?.set(savedGroupId, forKey: "scheduleGroupId")
         }
         self.sessionCache = Self.readSessionCacheFromDisk(fileName: sessionCacheFileName)
         self.offlineScheduleCache = Self.readSessionCacheFromDisk(fileName: offlineCacheFileName)

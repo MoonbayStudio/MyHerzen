@@ -75,6 +75,7 @@ class MainActivity : ComponentActivity() {
             val highContrast by userPreferences.highContrast.collectAsState(initial = false)
             val largerText by userPreferences.largerText.collectAsState(initial = false)
             val selectedGroupId by userPreferences.selectedGroupId.collectAsState(initial = null)
+            val scheduleGroupId by userPreferences.scheduleGroupId.collectAsState(initial = null)
             val onboardingCompleted by userPreferences.onboardingCompleted.collectAsState(initial = null)
             val appTheme = AppThemeCatalog.theme(selectedThemeId)
 
@@ -97,7 +98,7 @@ class MainActivity : ComponentActivity() {
                 largerText = largerText
             ) {
                 ThemedBackground(theme = appTheme) {
-                    AppNavigation(selectedGroupId, onboardingCompleted)
+                    AppNavigation(selectedGroupId, scheduleGroupId ?: selectedGroupId, onboardingCompleted)
                 }
             }
         }
@@ -130,12 +131,12 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 }
 
 @Composable
-fun AppNavigation(selectedGroupId: Int?, onboardingCompleted: Boolean?) {
+fun AppNavigation(selectedGroupId: Int?, scheduleGroupId: Int?, onboardingCompleted: Boolean?) {
     if (onboardingCompleted == null) return // Wait for preferences to load
 
     val navController = rememberNavController()
     val startDestination = if (onboardingCompleted == false) "onboarding"
-                          else if (selectedGroupId != null) Screen.Schedule.route
+                          else if (scheduleGroupId != null) Screen.Schedule.route
                           else "group_selection"
 
     val items = listOf(
@@ -159,7 +160,7 @@ fun AppNavigation(selectedGroupId: Int?, onboardingCompleted: Boolean?) {
             composable("onboarding") {
                 OnboardingScreen(
                     onFinish = {
-                        navController.navigate(if (selectedGroupId != null) Screen.Schedule.route else "group_selection") {
+                        navController.navigate(if (scheduleGroupId != null) Screen.Schedule.route else "group_selection") {
                             popUpTo("onboarding") { inclusive = true }
                         }
                     }
@@ -177,10 +178,17 @@ fun AppNavigation(selectedGroupId: Int?, onboardingCompleted: Boolean?) {
                     } else null
                 )
             }
+            composable("default_group_selection") {
+                GroupSelectionScreen(
+                    onGroupSelected = { navController.popBackStack() },
+                    onBack = { navController.popBackStack() },
+                    changesDefaultGroup = true
+                )
+            }
             composable(Screen.Schedule.route) {
-                if (selectedGroupId != null) {
+                if (scheduleGroupId != null) {
                     ScheduleScreen(
-                        groupId = selectedGroupId
+                        groupId = scheduleGroupId
                     )
                 }
             }
@@ -188,9 +196,9 @@ fun AppNavigation(selectedGroupId: Int?, onboardingCompleted: Boolean?) {
                 AssistantScreen()
             }
             composable(Screen.Session.route) {
-                if (selectedGroupId != null) {
+                if (scheduleGroupId != null) {
                     SessionScreen(
-                        groupId = selectedGroupId
+                        groupId = scheduleGroupId
                     )
                 }
             }

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from starlette.requests import Request
 
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, is_admin, is_moderator
 from app.core.rate_limit import limiter
 from app.db.models import User, UserSettings
 from app.db.session import get_db
@@ -120,6 +120,19 @@ async def update_settings(
         db.add(settings)
 
     if "selectedGroupId" in provided_fields:
+        is_group_change = (
+            settings.selected_group_id is not None
+            and settings.selected_group_id != data.selectedGroupId
+        )
+        if is_group_change and not (
+            is_admin(db=db, user=current_user)
+            or is_moderator(db=db, user=current_user)
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="Group change requires moderator approval",
+            )
+
         settings.selected_group_id = data.selectedGroupId
     if "selectedGroupName" in provided_fields:
         settings.selected_group_name = data.selectedGroupName

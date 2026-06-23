@@ -78,6 +78,14 @@ def can_access_group(
     user_id: int,
     group_id: int
 ) -> bool:
+    settings = db.query(UserSettings).filter(
+        UserSettings.user_id == user_id,
+        UserSettings.selected_group_id == group_id
+    ).first()
+
+    if settings is not None:
+        return True
+
     membership = db.query(GroupMembership).filter(
         GroupMembership.user_id == user_id,
         GroupMembership.group_id == group_id,

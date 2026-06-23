@@ -703,6 +703,102 @@ struct RoleRequestRejectRequest: Encodable {
     let comment: String?
 }
 
+struct GroupChangeRequestCreateRequest: Encodable {
+    let requestedGroupId: Int
+    let requestedGroupName: String?
+    let comment: String?
+}
+
+struct GroupChangeRequestReviewRequest: Encodable {
+    let comment: String?
+}
+
+struct GroupChangeRequestDTO: Decodable, Identifiable, Hashable {
+    let id: String
+    let userId: String
+    let userName: String?
+    let userEmail: String?
+    let currentGroupId: Int?
+    let currentGroupName: String?
+    let requestedGroupId: Int
+    let requestedGroupName: String?
+    let comment: String?
+    let status: String
+    let reviewedByAdminEmail: String?
+    let reviewComment: String?
+    let createdAt: String
+    let reviewedAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case userId
+        case snakeUserId = "user_id"
+        case userName
+        case snakeUserName = "user_name"
+        case userEmail
+        case snakeUserEmail = "user_email"
+        case currentGroupId
+        case snakeCurrentGroupId = "current_group_id"
+        case currentGroupName
+        case snakeCurrentGroupName = "current_group_name"
+        case requestedGroupId
+        case snakeRequestedGroupId = "requested_group_id"
+        case requestedGroupName
+        case snakeRequestedGroupName = "requested_group_name"
+        case comment
+        case status
+        case reviewedByAdminEmail
+        case snakeReviewedByAdminEmail = "reviewed_by_admin_email"
+        case reviewComment
+        case snakeReviewComment = "review_comment"
+        case createdAt
+        case snakeCreatedAt = "created_at"
+        case reviewedAt
+        case snakeReviewedAt = "reviewed_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let stringId = try? container.decode(String.self, forKey: .id) {
+            id = stringId
+        } else {
+            id = String(try container.decode(Int.self, forKey: .id))
+        }
+        if let stringUserId = try? container.decode(String.self, forKey: .userId) {
+            userId = stringUserId
+        } else if let intUserId = try? container.decode(Int.self, forKey: .userId) {
+            userId = String(intUserId)
+        } else if let stringUserId = try? container.decode(String.self, forKey: .snakeUserId) {
+            userId = stringUserId
+        } else {
+            userId = String(try container.decode(Int.self, forKey: .snakeUserId))
+        }
+        userName = try container.decodeIfPresent(String.self, forKey: .userName)
+            ?? container.decodeIfPresent(String.self, forKey: .snakeUserName)
+        userEmail = try container.decodeIfPresent(String.self, forKey: .userEmail)
+            ?? container.decodeIfPresent(String.self, forKey: .snakeUserEmail)
+        currentGroupId = try container.decodeIfPresent(Int.self, forKey: .currentGroupId)
+            ?? container.decodeIfPresent(Int.self, forKey: .snakeCurrentGroupId)
+        currentGroupName = try container.decodeIfPresent(String.self, forKey: .currentGroupName)
+            ?? container.decodeIfPresent(String.self, forKey: .snakeCurrentGroupName)
+        requestedGroupId = try container.decodeIfPresent(Int.self, forKey: .requestedGroupId)
+            ?? container.decode(Int.self, forKey: .snakeRequestedGroupId)
+        requestedGroupName = try container.decodeIfPresent(String.self, forKey: .requestedGroupName)
+            ?? container.decodeIfPresent(String.self, forKey: .snakeRequestedGroupName)
+        comment = try container.decodeIfPresent(String.self, forKey: .comment)
+        status = try container.decodeIfPresent(String.self, forKey: .status) ?? ""
+        reviewedByAdminEmail = try container.decodeIfPresent(String.self, forKey: .reviewedByAdminEmail)
+            ?? container.decodeIfPresent(String.self, forKey: .snakeReviewedByAdminEmail)
+        reviewComment = try container.decodeIfPresent(String.self, forKey: .reviewComment)
+            ?? container.decodeIfPresent(String.self, forKey: .snakeReviewComment)
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+            ?? container.decodeIfPresent(String.self, forKey: .snakeCreatedAt)
+            ?? ""
+        reviewedAt = try container.decodeIfPresent(String.self, forKey: .reviewedAt)
+            ?? container.decodeIfPresent(String.self, forKey: .snakeReviewedAt)
+    }
+}
+
 struct RoleRequestDTO: Decodable, Identifiable, Hashable {
     let id: String
     let requestedRole: String

@@ -2,7 +2,14 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from app.db.models import AppSetting, SystemNotice, UserSession, Badge, UserBadge
+from app.db.models import (
+    AppSetting,
+    Badge,
+    GroupChangeRequest,
+    SystemNotice,
+    UserBadge,
+    UserSession,
+)
 
 
 def ensure_runtime_feature_tables(engine: Engine) -> None:
@@ -11,6 +18,7 @@ def ensure_runtime_feature_tables(engine: Engine) -> None:
     UserSession.__table__.create(bind=engine, checkfirst=True)
     Badge.__table__.create(bind=engine, checkfirst=True)
     UserBadge.__table__.create(bind=engine, checkfirst=True)
+    GroupChangeRequest.__table__.create(bind=engine, checkfirst=True)
 
     # Migrations for UserSettings
     with engine.connect() as conn:
