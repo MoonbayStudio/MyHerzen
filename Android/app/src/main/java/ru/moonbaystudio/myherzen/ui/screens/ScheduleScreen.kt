@@ -40,12 +40,13 @@ fun ScheduleScreen(
     val isOffline by viewModel.isOffline.collectAsState()
     val defaultGroupId by viewModel.defaultGroupId.collectAsState(initial = -1)
     val isViewingDefaultGroupSchedule = defaultGroupId == groupId
+    val canShowHomework = currentUser != null && isViewingDefaultGroupSchedule
 
     var showDatePicker by remember { mutableStateOf(false) }
     var selectedLessonForHomework by remember { mutableStateOf<ScheduleItem?>(null) }
 
-    LaunchedEffect(isViewingDefaultGroupSchedule) {
-        if (!isViewingDefaultGroupSchedule) {
+    LaunchedEffect(canShowHomework) {
+        if (!canShowHomework) {
             selectedLessonForHomework = null
         }
     }
@@ -108,10 +109,10 @@ fun ScheduleScreen(
         selectedLessonForHomework?.let { lesson ->
             val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(selectedDate)
             val homework = homeworks["$dateStr|${lesson.time}|${lesson.title}"]
-            val canEdit = isViewingDefaultGroupSchedule &&
+            val canEdit = canShowHomework &&
                 (currentUser?.isAdmin == true || currentUser?.isModerator == true || currentUser?.isGroupLeader == true)
 
-            if (isViewingDefaultGroupSchedule) {
+            if (canShowHomework) {
                 HomeworkDialog(
                     lesson = lesson,
                     homework = homework,
@@ -149,12 +150,12 @@ fun ScheduleScreen(
                         items(items) { item ->
                             val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(selectedDate)
                             val homework = homeworks["$dateStr|${item.time}|${item.title}"]
-                            val canEdit = isViewingDefaultGroupSchedule &&
+                            val canEdit = canShowHomework &&
                                 (currentUser?.isAdmin == true || currentUser?.isModerator == true || currentUser?.isGroupLeader == true)
 
                             ScheduleItemCard(
                                 item = item,
-                                homework = if (isViewingDefaultGroupSchedule) homework else null,
+                                homework = if (canShowHomework) homework else null,
                                 canEdit = canEdit,
                                 onHomeworkClick = { selectedLessonForHomework = item }
                             )

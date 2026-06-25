@@ -2,6 +2,7 @@ package ru.moonbaystudio.myherzen.data.local.dao
 
 import androidx.room.*
 import kotlinx.coroutines.flow.Flow
+import ru.moonbaystudio.myherzen.data.local.entity.LocalScheduleCacheDay
 import ru.moonbaystudio.myherzen.data.local.entity.LocalScheduleItem
 
 @Dao
@@ -22,18 +23,42 @@ interface ScheduleDao {
     suspend fun deleteSchedule(groupId: Int, date: String)
 
     @Query("DELETE FROM schedule_items WHERE groupId = :groupId AND date < :date AND period = ''")
-    suspend fun deleteScheduleBefore(groupId: Int, date: String)
+    suspend fun deleteScheduleItemsBefore(groupId: Int, date: String)
 
     @Query("DELETE FROM schedule_items WHERE groupId = :groupId AND date > :date AND period = ''")
-    suspend fun deleteScheduleAfter(groupId: Int, date: String)
+    suspend fun deleteScheduleItemsAfter(groupId: Int, date: String)
 
-    @Query("SELECT MAX(date) FROM schedule_items WHERE groupId = :groupId AND period = ''")
+    @Query("DELETE FROM schedule_cache_days WHERE groupId = :groupId AND date < :date AND examOnly = 0")
+    suspend fun deleteCachedScheduleDaysBefore(groupId: Int, date: String)
+
+    @Query("DELETE FROM schedule_cache_days WHERE groupId = :groupId AND date > :date AND examOnly = 0")
+    suspend fun deleteCachedScheduleDaysAfter(groupId: Int, date: String)
+
+    @Query("DELETE FROM schedule_cache_days WHERE groupId = :groupId AND examOnly = 0")
+    suspend fun deleteCachedScheduleDays(groupId: Int)
+
+    @Query("""
+        SELECT MAX(date) FROM (
+            SELECT date FROM schedule_items WHERE groupId = :groupId AND period = ''
+            UNION
+            SELECT date FROM schedule_cache_days WHERE groupId = :groupId AND examOnly = 0
+        )
+    """)
     suspend fun getMaxDate(groupId: Int): String?
 
-    @Query("SELECT MIN(date) FROM schedule_items WHERE groupId = :groupId AND period = ''")
+    @Query("""
+        SELECT MIN(date) FROM (
+            SELECT date FROM schedule_items WHERE groupId = :groupId AND period = ''
+            UNION
+            SELECT date FROM schedule_cache_days WHERE groupId = :groupId AND examOnly = 0
+        )
+    """)
     suspend fun getMinDate(groupId: Int): String?
 
-    @Query("SELECT EXISTS(SELECT 1 FROM schedule_items WHERE groupId = :groupId AND date = :date AND period = '')")
+    @Query("""
+        SELECT EXISTS(SELECT 1 FROM schedule_cache_days WHERE groupId = :groupId AND date = :date AND examOnly = 0)
+            OR EXISTS(SELECT 1 FROM schedule_items WHERE groupId = :groupId AND date = :date AND period = '')
+    """)
     suspend fun hasDataForDate(groupId: Int, date: String): Boolean
 
     @Query("SELECT EXISTS(SELECT 1 FROM schedule_items WHERE groupId = :groupId AND period != '')")
@@ -42,10 +67,32 @@ interface ScheduleDao {
     @Query("DELETE FROM schedule_items WHERE groupId = :groupId AND period != ''")
     suspend fun deleteSession(groupId: Int)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun markScheduleDayCached(day: LocalScheduleCacheDay)
+
+    @Transaction
+    suspend fun deleteScheduleBefore(groupId: Int, date: String) {
+        deleteScheduleItemsBefore(groupId, date)
+        deleteCachedScheduleDaysBefore(groupId, date)
+    }
+
+    @Transaction
+    suspend fun deleteScheduleAfter(groupId: Int, date: String) {
+        deleteScheduleItemsAfter(groupId, date)
+        deleteCachedScheduleDaysAfter(groupId, date)
+    }
+
+    @Transaction
+    suspend fun deleteScheduleCache(groupId: Int) {
+        deleteScheduleItemsBefore(groupId, "9999-99-99")
+        deleteCachedScheduleDays(groupId)
+    }
+
     @Transaction
     suspend fun updateSchedule(groupId: Int, date: String, items: List<LocalScheduleItem>) {
         deleteSchedule(groupId, date)
         insertAll(items)
+        markScheduleDayCached(LocalScheduleCacheDay(groupId, date, false))
     }
 
     @Transaction

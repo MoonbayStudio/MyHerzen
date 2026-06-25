@@ -52,10 +52,10 @@ class ScheduleViewModel @Inject constructor(
     val selectedDate: StateFlow<Date> = _selectedDate.asStateFlow()
     private val _examOnly = MutableStateFlow(false)
 
-    private val _temporaryItems = MutableStateFlow<Map<String, List<ScheduleItem>>>(emptyMap())
-
     private val _homeworks = MutableStateFlow<Map<String, Homework>>(emptyMap())
     val homeworks: StateFlow<Map<String, Homework>> = _homeworks.asStateFlow()
+
+    private val requestDateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
 
     val currentUser = authRepository.currentUser
     val defaultGroupId = settingsRepository.selectedGroupId
@@ -63,16 +63,14 @@ class ScheduleViewModel @Inject constructor(
     val scheduleItems: StateFlow<List<ScheduleItem>> = combine(
         _groupId,
         _selectedDate,
-        _examOnly,
-        _temporaryItems
-    ) { id, date, exam, temp ->
-        val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date)
-        DataState(id, date, dateStr, exam, temp[dateStr])
+        _examOnly
+    ) { id, date, exam ->
+        DataState(id, date, exam)
     }.flatMapLatest { state ->
         if (state.id != null) {
             repository.getScheduleFlow(state.id, state.date, state.examOnly)
                 .map { local ->
-                    state.tempItems ?: local
+                    local
                 }
                 .scan(emptyList<ScheduleItem>()) { previous, next ->
                     // If next is empty but we are loading OR we had data and Room hasn't emitted yet, keep previous
@@ -86,9 +84,7 @@ class ScheduleViewModel @Inject constructor(
     data class DataState(
         val id: Int?,
         val date: Date,
-        val dateStr: String,
-        val examOnly: Boolean,
-        val tempItems: List<ScheduleItem>?
+        val examOnly: Boolean
     )
 
     fun loadSchedule(groupId: Int, examOnly: Boolean = false) {
@@ -128,7 +124,16 @@ class ScheduleViewModel @Inject constructor(
             try {
                 // Ensure we are in "loading" state for scan operator
                 kotlinx.coroutines.delay(50)
+                val offlineScheduleEnabled = settingsRepository.offlineScheduleEnabled.first()
+                val cacheWeeks = settingsRepository.scheduleCacheWeeks.first().coerceIn(1, 4)
+                val maxCached = if (!examOnly && offlineScheduleEnabled) repository.getMaxCachedDate(groupId) else null
+                val extendsCachedWindow = maxCached != null &&
+                    requestDateFormatter.format(maxCached) == requestDateFormatter.format(date)
+
                 repository.refreshScheduleRange(groupId, date, date, examOnly)
+                if (extendsCachedWindow) {
+                    loadCacheRange(groupId, date, cacheWeeks)
+                }
 
                 if (!examOnly) {
                     loadHomeworksForVisibleSchedule(date)
@@ -182,9 +187,7 @@ class ScheduleViewModel @Inject constructor(
                     if (!offlineScheduleEnabled) {
                         _isLoading.value = true
                         try {
-                            val remoteItems = repository.fetchSchedule(groupId, date, false)
-                            val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date)
-                            _temporaryItems.value = _temporaryItems.value + (dateStr to remoteItems)
+                            repository.refreshScheduleRange(groupId, date, date, false)
                             _isOffline.value = false
                         } catch (e: Exception) {
                             _isOffline.value = true
@@ -200,17 +203,12 @@ class ScheduleViewModel @Inject constructor(
                             set(Calendar.MILLISECOND, 0)
                         }.time
 
-                        val rangeEnd = Calendar.getInstance().apply {
-                            time = today
-                            add(Calendar.WEEK_OF_YEAR, cacheWeeks)
-                        }.time
+                        val (rangeStart, rangeEnd) = offlineCacheWindow(today, cacheWeeks)
 
-                        if (date.before(today) || date.after(rangeEnd)) {
+                        if (date.before(rangeStart) || date.after(rangeEnd)) {
                             _isLoading.value = true
                             try {
-                                val remoteItems = repository.fetchSchedule(groupId, date, false)
-                                val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date)
-                                _temporaryItems.value = _temporaryItems.value + (dateStr to remoteItems)
+                                repository.refreshScheduleRange(groupId, date, date, false)
                                 _isOffline.value = false
                             } catch (e: Exception) {
                                 _isOffline.value = true
@@ -262,9 +260,12 @@ class ScheduleViewModel @Inject constructor(
         try {
             _isLoading.value = true
             val cal = Calendar.getInstance()
+            val normalizedWeeks = weeks.coerceIn(1, 4)
             cal.time = startDate
-            val rangeStart = startDate
-            cal.add(Calendar.WEEK_OF_YEAR, weeks)
+            cal.add(Calendar.DAY_OF_YEAR, -7)
+            val rangeStart = cal.time
+            cal.time = startDate
+            cal.add(Calendar.DAY_OF_YEAR, normalizedWeeks * 7 - 1)
             val rangeEnd = cal.time
 
             repository.refreshScheduleRange(groupId, rangeStart, rangeEnd, false)
@@ -276,6 +277,17 @@ class ScheduleViewModel @Inject constructor(
         } finally {
             _isLoading.value = false
         }
+    }
+
+    private fun offlineCacheWindow(anchorDate: Date, weeks: Int): Pair<Date, Date> {
+        val normalizedWeeks = weeks.coerceIn(1, 4)
+        val calendar = Calendar.getInstance()
+        calendar.time = anchorDate
+        calendar.add(Calendar.DAY_OF_YEAR, -7)
+        val rangeStart = calendar.time
+        calendar.time = anchorDate
+        calendar.add(Calendar.DAY_OF_YEAR, normalizedWeeks * 7 - 1)
+        return rangeStart to calendar.time
     }
 
     fun dismissWarning() {
@@ -369,6 +381,7 @@ class ScheduleViewModel @Inject constructor(
 
     private suspend fun homeworkGroupIdForVisibleSchedule(): Int? {
         val scheduleGroupId = _groupId.value ?: return null
+        if (!authRepository.isLoggedIn.first()) return null
         val defaultGroupId = settingsRepository.selectedGroupId.first() ?: return null
         return defaultGroupId.takeIf { it == scheduleGroupId }
     }

@@ -173,11 +173,7 @@ class ScheduleRepository @Inject constructor(
             while (!calendar.time.after(endDate)) {
                 val d = requestDateFormatter.format(calendar.time)
                 val itemsForDay = localItems.filter { it.date == d }
-
-                // Only update if we have items OR if it's a single day refresh (more trust)
-                if (itemsForDay.isNotEmpty() || startDateStr == endDateStr) {
-                    scheduleDao.updateSchedule(groupId, d, itemsForDay)
-                }
+                scheduleDao.updateSchedule(groupId, d, itemsForDay)
                 calendar.add(java.util.Calendar.DAY_OF_YEAR, 1)
             }
         }
@@ -192,7 +188,7 @@ class ScheduleRepository @Inject constructor(
     }
 
     suspend fun clearCache(groupId: Int) {
-        scheduleDao.deleteScheduleBefore(groupId, "9999-99-99")
+        scheduleDao.deleteScheduleCache(groupId)
         scheduleDao.deleteSession(groupId)
     }
 

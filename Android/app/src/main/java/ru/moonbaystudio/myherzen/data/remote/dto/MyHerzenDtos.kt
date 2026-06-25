@@ -23,6 +23,7 @@ data class AssistantChatRequest(
     val context: AssistantContext,
     @SerializedName("conversationId") val conversationId: String,
     @SerializedName("groupId") val groupId: Int?,
+    @SerializedName("groupName") val groupName: String?,
     @SerializedName("targetDate") val targetDate: String?,
     @SerializedName("cachedSchedule") val cachedSchedule: CachedSchedulePayload?
 )
@@ -34,6 +35,7 @@ data class AssistantChatMessagePayload(
 
 data class AssistantContext(
     @SerializedName("selectedGroupId") val selectedGroupId: Int?,
+    @SerializedName("selectedGroupName") val selectedGroupName: String?,
     @SerializedName("selectedDate") val selectedDate: String?
 )
 

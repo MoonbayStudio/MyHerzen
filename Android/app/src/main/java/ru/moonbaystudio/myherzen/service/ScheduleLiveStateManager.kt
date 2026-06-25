@@ -11,7 +11,17 @@ import javax.inject.Singleton
 class ScheduleLiveStateManager @Inject constructor(
     private val repository: ScheduleRepository
 ) {
-    private val isoFormatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+    private val isoFormatters = listOf(
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.US),
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US),
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        },
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
+            timeZone = TimeZone.getTimeZone("UTC")
+        },
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US)
+    )
 
     suspend fun getCurrentState(groupId: Int): ScheduleLiveState {
         val now = Date()
@@ -31,8 +41,8 @@ class ScheduleLiveStateManager @Inject constructor(
 
         for (i in sortedLessons.indices) {
             val lesson = sortedLessons[i]
-            val startTime = isoFormatter.parse(lesson.sortDateIso!!) ?: continue
-            val endTime = isoFormatter.parse(lesson.endDateIso!!) ?: continue
+            val startTime = parseIsoDate(lesson.sortDateIso) ?: continue
+            val endTime = parseIsoDate(lesson.endDateIso) ?: continue
 
             if (now.before(startTime)) {
                 // If it's before the first lesson or between lessons (break)
@@ -50,5 +60,15 @@ class ScheduleLiveStateManager @Inject constructor(
         }
 
         return ScheduleLiveState.AfterLessons
+    }
+
+    private fun parseIsoDate(value: String): Date? {
+        for (formatter in isoFormatters) {
+            try {
+                return formatter.parse(value)
+            } catch (_: Exception) {
+            }
+        }
+        return null
     }
 }

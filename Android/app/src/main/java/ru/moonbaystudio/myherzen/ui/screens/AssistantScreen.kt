@@ -9,9 +9,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -137,11 +137,13 @@ fun AssistantScreen(
                                 enabled = !isLoading && aiEnabled
                             )
                             IconButton(
-                                onClick = { viewModel.sendMessage() },
-                                enabled = inputText.isNotBlank() && !isLoading && aiEnabled
+                                onClick = {
+                                    if (isLoading) viewModel.cancelCurrentRequest() else viewModel.sendMessage()
+                                },
+                                enabled = (inputText.isNotBlank() && aiEnabled) || isLoading
                             ) {
                                 if (isLoading) {
-                                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                    Icon(imageVector = Icons.Default.Close, contentDescription = "Отменить", tint = MaterialTheme.colorScheme.primary)
                                 } else {
                                     Icon(imageVector = Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
                                 }

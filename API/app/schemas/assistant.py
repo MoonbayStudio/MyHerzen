@@ -3,6 +3,7 @@ from pydantic import BaseModel
 
 class AssistantChatContext(BaseModel):
     selectedGroupId: Optional[int] = None
+    selectedGroupName: Optional[str] = None
     selectedDate: Optional[str] = None
 
 class CachedScheduleLesson(BaseModel):
@@ -30,6 +31,7 @@ class AssistantChatRequest(BaseModel):
     context: Optional[AssistantChatContext] = None
     conversationId: Optional[str] = None
     groupId: Optional[int] = None
+    groupName: Optional[str] = None
     targetDate: Optional[str] = None
     cachedSchedule: Optional[CachedSchedulePayload] = None
 
