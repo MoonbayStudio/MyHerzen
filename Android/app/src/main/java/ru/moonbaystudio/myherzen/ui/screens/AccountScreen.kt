@@ -27,6 +27,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
+import ru.moonbaystudio.myherzen.data.remote.dto.RoleRequest
 import ru.moonbaystudio.myherzen.ui.components.ActionCapsule
 import ru.moonbaystudio.myherzen.ui.components.BadgeDetailDialog
 import ru.moonbaystudio.myherzen.ui.components.BadgeIcon
@@ -47,11 +48,19 @@ fun AccountScreen(
     val currentUser by viewModel.currentUser.collectAsState()
     val isLoggedIn by viewModel.isLoggedIn.collectAsState(initial = false)
     val isLoading by viewModel.isLoading.collectAsState()
+    val error by viewModel.error.collectAsState()
+    val roleRequests by viewModel.roleRequests.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val selectedGroupName by settingsViewModel.selectedGroupName.collectAsState()
+
+    LaunchedEffect(isLoggedIn) {
+        if (isLoggedIn) {
+            viewModel.loadRoleRequests()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -136,6 +145,15 @@ fun AccountScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    error?.let {
+                        Text(
+                            text = it,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
+
                     if (currentUser?.contactEmail != null && !currentUser!!.contactEmailVerified) {
                         EmailVerificationBanner(
                             email = currentUser!!.contactEmail!!,
@@ -171,6 +189,15 @@ fun AccountScreen(
                                 }
                             }
                         }
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+
+                    if (currentUser?.isAdmin != true && currentUser?.isTester != true) {
+                        RoleRequestCard(
+                            requests = roleRequests,
+                            isLoading = isLoading,
+                            onRequestTester = { viewModel.requestTesterRole() }
+                        )
                         Spacer(modifier = Modifier.height(16.dp))
                     }
                     
@@ -280,6 +307,57 @@ fun AccountScreen(
             }
             
             Spacer(modifier = Modifier.height(120.dp))
+        }
+    }
+}
+
+@Composable
+fun RoleRequestCard(
+    requests: List<RoleRequest>,
+    isLoading: Boolean,
+    onRequestTester: () -> Unit
+) {
+    val testerRequest = requests.firstOrNull { it.roleType == "tester" }
+    val hasPendingTesterRequest = testerRequest?.status == "pending"
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Роль тестера", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = when (testerRequest?.status) {
+                    "pending" -> "Заявка на рассмотрении."
+                    "approved" -> "Заявка одобрена. Обновите профиль, если роль еще не появилась."
+                    "rejected" -> testerRequest.reviewComment ?: "Заявка отклонена."
+                    else -> "Можно запросить доступ к тестовым возможностям приложения."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            if (requests.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                requests.take(3).forEach { request ->
+                    Text(
+                        text = "${request.roleType}: ${request.status}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Button(
+                onClick = onRequestTester,
+                enabled = !isLoading && !hasPendingTesterRequest,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(if (hasPendingTesterRequest) "Заявка отправлена" else "Запросить роль тестера")
+            }
         }
     }
 }

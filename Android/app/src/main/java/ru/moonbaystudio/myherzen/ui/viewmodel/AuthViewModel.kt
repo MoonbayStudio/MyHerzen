@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import ru.moonbaystudio.myherzen.data.remote.dto.AccountSession
 import ru.moonbaystudio.myherzen.data.remote.dto.AppleUser
+import ru.moonbaystudio.myherzen.data.remote.dto.RoleRequest
 import ru.moonbaystudio.myherzen.data.repository.AuthRepository
 import javax.inject.Inject
 
@@ -28,6 +29,9 @@ class AuthViewModel @Inject constructor(
 
     private val _sessions = MutableStateFlow<List<AccountSession>>(emptyList())
     val sessions: StateFlow<List<AccountSession>> = _sessions.asStateFlow()
+
+    private val _roleRequests = MutableStateFlow<List<RoleRequest>>(emptyList())
+    val roleRequests: StateFlow<List<RoleRequest>> = _roleRequests.asStateFlow()
 
     private val _isVerificationRequired = MutableStateFlow(false)
     val isVerificationRequired: StateFlow<Boolean> = _isVerificationRequired.asStateFlow()
@@ -220,6 +224,31 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             authRepository.logoutOthers()
             loadSessions()
+        }
+    }
+
+    fun loadRoleRequests() {
+        viewModelScope.launch {
+            _roleRequests.value = authRepository.getMyRoleRequests()
+        }
+    }
+
+    fun requestTesterRole() {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            val result = authRepository.createRoleRequest(
+                type = "tester",
+                groupId = null,
+                groupName = null,
+                comment = "Хочу тестировать Android-версию MyHerzen"
+            )
+            if (result.isSuccess) {
+                loadRoleRequests()
+            } else {
+                _error.value = result.exceptionOrNull()?.message ?: "Не удалось отправить заявку"
+            }
+            _isLoading.value = false
         }
     }
 

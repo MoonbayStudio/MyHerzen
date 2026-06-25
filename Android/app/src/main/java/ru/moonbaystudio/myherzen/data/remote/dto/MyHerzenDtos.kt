@@ -274,17 +274,19 @@ data class SystemNoticeMutationRequest(
 )
 
 data class RoleRequestCreateRequest(
-    @SerializedName("role_type") val roleType: String,
-    @SerializedName("group_id") val groupId: Int?,
-    @SerializedName("group_name") val groupName: String?,
+    @SerializedName("roleType") val roleType: String,
+    @SerializedName("groupId") val groupId: Int?,
+    @SerializedName("groupName") val groupName: String?,
     val comment: String?
 )
 
 data class RoleRequest(
     val id: String,
-    @SerializedName("role_type") val roleType: String,
+    @SerializedName("roleType", alternate = ["role_type", "requestedRole"]) val roleType: String,
     val status: String,
-    @SerializedName("created_at") val createdAt: String
+    @SerializedName("createdAt", alternate = ["created_at"]) val createdAt: String,
+    @SerializedName("reviewComment") val reviewComment: String? = null,
+    val comment: String? = null
 )
 
 data class GroupChangeRequestCreateRequest(
@@ -336,11 +338,12 @@ data class AdminUserDto(
 
 data class AdminRoleRequestDto(
     val id: Int,
-    @SerializedName("user_id") val userId: String,
-    @SerializedName("user_email") val userEmail: String?,
-    @SerializedName("role_type") val roleType: String,
+    @SerializedName("userId", alternate = ["user_id"]) val userId: String,
+    @SerializedName("userEmail", alternate = ["user_email"]) val userEmail: String?,
+    @SerializedName("roleType", alternate = ["role_type", "requestedRole"]) val roleType: String,
     val status: String,
-    @SerializedName("created_at") val createdAt: String
+    @SerializedName("createdAt", alternate = ["created_at"]) val createdAt: String,
+    @SerializedName("reviewComment") val reviewComment: String? = null
 )
 
 data class RuntimeSettingPatchRequest(val value: Any)
