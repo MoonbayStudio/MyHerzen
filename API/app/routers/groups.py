@@ -350,6 +350,36 @@ def get_my_group_change_requests(
     ]
 
 
+@router.post(
+    "/group-change-requests/{request_id}/cancel",
+    response_model=GroupChangeRequestResponse,
+)
+def cancel_group_change_request(
+    request_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    request = db.query(GroupChangeRequest).filter(
+        GroupChangeRequest.id == request_id,
+        GroupChangeRequest.user_id == user.id,
+    ).first()
+
+    if request is None:
+        raise HTTPException(status_code=404, detail="Group change request not found")
+
+    if request.status != "pending":
+        raise HTTPException(
+            status_code=400,
+            detail="Only pending requests can be cancelled",
+        )
+
+    request.status = "cancelled"
+    db.commit()
+    db.refresh(request)
+
+    return group_change_request_to_response(request=request, target_user=user)
+
+
 @router.get(
     "/moderation/group-change-requests",
     response_model=list[GroupChangeRequestResponse],
@@ -361,7 +391,7 @@ def get_moderation_group_change_requests(
 ):
     ensure_admin_or_moderator(db=db, user=user)
 
-    allowed_statuses = {"pending", "approved", "rejected", "all"}
+    allowed_statuses = {"pending", "approved", "rejected", "cancelled", "all"}
     normalized_status = status.strip().lower()
     if normalized_status not in allowed_statuses:
         raise HTTPException(status_code=400, detail="Invalid status filter")

@@ -158,8 +158,20 @@ class AuthRepository @Inject constructor(
         return safeApiCall { apiService.getMyRoleRequests() }.toResult().getOrElse { emptyList() }
     }
 
+    suspend fun getMyGroupChangeRequests(): List<GroupChangeRequestDto> {
+        return safeApiCall { apiService.getMyGroupChangeRequests() }.toResult().getOrElse { emptyList() }
+    }
+
     suspend fun createRoleRequest(type: String, groupId: Int?, groupName: String?, comment: String?): Result<RoleRequest> {
         return safeApiCall { apiService.createRoleRequest(RoleRequestCreateRequest(type, groupId, groupName, comment)) }.toResult()
+    }
+
+    suspend fun cancelRoleRequest(requestId: String): Result<RoleRequest> {
+        return safeApiCall { apiService.cancelRoleRequest(requestId) }.toResult()
+    }
+
+    suspend fun cancelGroupChangeRequest(requestId: Int): Result<GroupChangeRequestDto> {
+        return safeApiCall { apiService.cancelGroupChangeRequest(requestId) }.toResult()
     }
 
     suspend fun requestEmailVerification(email: String): Result<Unit> {
@@ -190,8 +202,10 @@ class AuthRepository @Inject constructor(
         return safeApiCall { apiService.approveRoleRequest(requestId) }.toResult().map { Unit }
     }
 
-    suspend fun rejectRoleRequest(requestId: Int): Result<Unit> {
-        return safeApiCall { apiService.rejectRoleRequest(requestId) }.toResult().map { Unit }
+    suspend fun rejectRoleRequest(requestId: Int, comment: String? = null): Result<Unit> {
+        return safeApiCall {
+            apiService.rejectRoleRequest(requestId, RoleRequestReviewRequest(comment))
+        }.toResult().map { Unit }
     }
 
     suspend fun approveGroupChangeRequest(requestId: Int): Result<Unit> {

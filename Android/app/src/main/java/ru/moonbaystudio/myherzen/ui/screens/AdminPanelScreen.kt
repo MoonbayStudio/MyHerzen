@@ -49,6 +49,8 @@ fun AdminPanelScreen(
     var searchText by remember { mutableStateOf("") }
     var userToEdit by remember { mutableStateOf<AdminUserDto?>(null) }
     var showCreateNoticeDialog by remember { mutableStateOf(false) }
+    var roleRequestToReject by remember { mutableStateOf<AdminRoleRequestDto?>(null) }
+    var groupChangeRequestToReject by remember { mutableStateOf<GroupChangeRequestDto?>(null) }
 
     LaunchedEffect(Unit) {
         viewModel.loadAllData()
@@ -74,6 +76,31 @@ fun AdminPanelScreen(
             onBadgeToggle = { code, enabled, note -> viewModel.setBadge(userToEdit!!.id, code, enabled, note) },
             onLoadSessions = { viewModel.loadUserSessions(userToEdit!!.id) },
             onRevokeSession = { viewModel.revokeUserSession(userToEdit!!.id, it) }
+        )
+    }
+
+    roleRequestToReject?.let { request ->
+        RejectRequestDialog(
+            title = "Отклонить заявку",
+            subject = request.userEmail ?: "ID: ${request.userId}",
+            onDismiss = { roleRequestToReject = null },
+            onConfirm = { comment ->
+                viewModel.rejectRequest(request.id, comment)
+                roleRequestToReject = null
+            }
+        )
+    }
+
+    groupChangeRequestToReject?.let { request ->
+        val requestedGroup = request.requestedGroupName ?: request.requestedGroupId.toString()
+        RejectRequestDialog(
+            title = "Отклонить смену группы",
+            subject = requestedGroup,
+            onDismiss = { groupChangeRequestToReject = null },
+            onConfirm = { comment ->
+                viewModel.rejectGroupChangeRequest(request.id, comment)
+                groupChangeRequestToReject = null
+            }
         )
     }
 
@@ -170,14 +197,14 @@ fun AdminPanelScreen(
                                     GroupChangeRequestListItem(
                                         request = request,
                                         onApprove = { viewModel.approveGroupChangeRequest(request.id) },
-                                        onReject = { viewModel.rejectGroupChangeRequest(request.id) }
+                                        onReject = { groupChangeRequestToReject = request }
                                     )
                                 }
                                 items(items = requests) { request ->
                                     RequestListItem(
                                         request = request,
                                         onApprove = { viewModel.approveRequest(request.id) },
-                                        onReject = { viewModel.rejectRequest(request.id) }
+                                        onReject = { roleRequestToReject = request }
                                     )
                                 }
                                 if (requests.isEmpty() && groupChangeRequests.isEmpty()) {
@@ -214,6 +241,49 @@ fun EmptyState(text: String) {
     Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
         Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+}
+
+@Composable
+fun RejectRequestDialog(
+    title: String,
+    subject: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String?) -> Unit
+) {
+    var comment by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                Text(subject, style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = comment,
+                    onValueChange = { comment = it },
+                    label = { Text("Комментарий") },
+                    placeholder = { Text("Причина отклонения") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(comment.trim().ifBlank { null }) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Text("Отклонить")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
+        }
+    )
 }
 
 @Composable

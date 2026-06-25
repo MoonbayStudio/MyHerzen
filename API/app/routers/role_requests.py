@@ -162,6 +162,33 @@ async def get_my_role_requests(
     ]
 
 
+@router.post("/role-requests/{request_id}/cancel", response_model=RoleRequestResponse)
+async def cancel_role_request(
+    request_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    role_request = db.query(RoleRequest).filter(
+        RoleRequest.id == request_id,
+        RoleRequest.user_id == current_user.id,
+    ).first()
+
+    if role_request is None:
+        raise HTTPException(status_code=404, detail="Role request not found")
+
+    if role_request.status != "pending":
+        raise HTTPException(
+            status_code=400,
+            detail="Only pending requests can be cancelled",
+        )
+
+    role_request.status = "cancelled"
+    db.commit()
+    db.refresh(role_request)
+
+    return role_request_to_response(role_request, user=current_user)
+
+
 @router.post("/me/role-requests", response_model=MeRoleRequestResponse)
 async def create_my_role_request(
     data: MeRoleRequestCreateRequest,

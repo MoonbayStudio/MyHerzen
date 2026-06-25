@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import ru.moonbaystudio.myherzen.data.remote.dto.AccountSession
 import ru.moonbaystudio.myherzen.data.remote.dto.AppleUser
+import ru.moonbaystudio.myherzen.data.remote.dto.GroupChangeRequestDto
 import ru.moonbaystudio.myherzen.data.remote.dto.RoleRequest
 import ru.moonbaystudio.myherzen.data.repository.AuthRepository
 import javax.inject.Inject
@@ -32,6 +33,9 @@ class AuthViewModel @Inject constructor(
 
     private val _roleRequests = MutableStateFlow<List<RoleRequest>>(emptyList())
     val roleRequests: StateFlow<List<RoleRequest>> = _roleRequests.asStateFlow()
+
+    private val _groupChangeRequests = MutableStateFlow<List<GroupChangeRequestDto>>(emptyList())
+    val groupChangeRequests: StateFlow<List<GroupChangeRequestDto>> = _groupChangeRequests.asStateFlow()
 
     private val _isVerificationRequired = MutableStateFlow(false)
     val isVerificationRequired: StateFlow<Boolean> = _isVerificationRequired.asStateFlow()
@@ -228,8 +232,13 @@ class AuthViewModel @Inject constructor(
     }
 
     fun loadRoleRequests() {
+        loadMyRequests()
+    }
+
+    fun loadMyRequests() {
         viewModelScope.launch {
             _roleRequests.value = authRepository.getMyRoleRequests()
+            _groupChangeRequests.value = authRepository.getMyGroupChangeRequests()
         }
     }
 
@@ -244,9 +253,37 @@ class AuthViewModel @Inject constructor(
                 comment = "Хочу тестировать Android-версию MyHerzen"
             )
             if (result.isSuccess) {
-                loadRoleRequests()
+                loadMyRequests()
             } else {
                 _error.value = result.exceptionOrNull()?.message ?: "Не удалось отправить заявку"
+            }
+            _isLoading.value = false
+        }
+    }
+
+    fun cancelRoleRequest(requestId: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            val result = authRepository.cancelRoleRequest(requestId)
+            if (result.isSuccess) {
+                loadMyRequests()
+            } else {
+                _error.value = result.exceptionOrNull()?.message ?: "Не удалось отменить заявку"
+            }
+            _isLoading.value = false
+        }
+    }
+
+    fun cancelGroupChangeRequest(requestId: Int) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            val result = authRepository.cancelGroupChangeRequest(requestId)
+            if (result.isSuccess) {
+                loadMyRequests()
+            } else {
+                _error.value = result.exceptionOrNull()?.message ?: "Не удалось отменить заявку"
             }
             _isLoading.value = false
         }

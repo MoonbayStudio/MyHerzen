@@ -301,6 +301,10 @@ data class GroupChangeRequestReviewRequest(
     val comment: String?
 )
 
+data class RoleRequestReviewRequest(
+    val comment: String?
+)
+
 data class GroupChangeRequestDto(
     val id: Int,
     @SerializedName("userId") val userId: Int,

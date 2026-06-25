@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -28,6 +29,7 @@ import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import kotlinx.coroutines.launch
 import ru.moonbaystudio.myherzen.data.remote.dto.RoleRequest
+import ru.moonbaystudio.myherzen.data.remote.dto.GroupChangeRequestDto
 import ru.moonbaystudio.myherzen.ui.components.ActionCapsule
 import ru.moonbaystudio.myherzen.ui.components.BadgeDetailDialog
 import ru.moonbaystudio.myherzen.ui.components.BadgeIcon
@@ -50,6 +52,7 @@ fun AccountScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val roleRequests by viewModel.roleRequests.collectAsState()
+    val groupChangeRequests by viewModel.groupChangeRequests.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     
@@ -58,7 +61,7 @@ fun AccountScreen(
 
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
-            viewModel.loadRoleRequests()
+            viewModel.loadMyRequests()
         }
     }
 
@@ -192,11 +195,16 @@ fun AccountScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                     }
 
-                    if (currentUser?.isAdmin != true && currentUser?.isTester != true) {
-                        RoleRequestCard(
+                    val canRequestTester = currentUser?.isAdmin != true && currentUser?.isTester != true
+                    if (canRequestTester || roleRequests.isNotEmpty() || groupChangeRequests.isNotEmpty()) {
+                        MyRequestsCard(
                             requests = roleRequests,
+                            groupChangeRequests = groupChangeRequests,
                             isLoading = isLoading,
-                            onRequestTester = { viewModel.requestTesterRole() }
+                            canRequestTester = canRequestTester,
+                            onRequestTester = { viewModel.requestTesterRole() },
+                            onCancelRoleRequest = { viewModel.cancelRoleRequest(it) },
+                            onCancelGroupChangeRequest = { viewModel.cancelGroupChangeRequest(it) }
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                     }
@@ -312,53 +320,190 @@ fun AccountScreen(
 }
 
 @Composable
-fun RoleRequestCard(
+fun MyRequestsCard(
     requests: List<RoleRequest>,
+    groupChangeRequests: List<GroupChangeRequestDto>,
     isLoading: Boolean,
-    onRequestTester: () -> Unit
+    canRequestTester: Boolean,
+    onRequestTester: () -> Unit,
+    onCancelRoleRequest: (String) -> Unit,
+    onCancelGroupChangeRequest: (Int) -> Unit
 ) {
     val testerRequest = requests.firstOrNull { it.roleType == "tester" }
     val hasPendingTesterRequest = testerRequest?.status == "pending"
+    val hasRequests = requests.isNotEmpty() || groupChangeRequests.isNotEmpty()
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Роль тестера", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = when (testerRequest?.status) {
-                    "pending" -> "Заявка на рассмотрении."
-                    "approved" -> "Заявка одобрена. Обновите профиль, если роль еще не появилась."
-                    "rejected" -> testerRequest.reviewComment ?: "Заявка отклонена."
-                    else -> "Можно запросить доступ к тестовым возможностям приложения."
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Text("Мои заявки", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+
+            if (!hasRequests) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "Здесь появятся заявки на роли и смену группы.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             if (requests.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
-                requests.take(3).forEach { request ->
-                    Text(
-                        text = "${request.roleType}: ${request.status}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                Spacer(Modifier.height(12.dp))
+                requests.forEach { request ->
+                    UserRoleRequestRow(
+                        request = request,
+                        isLoading = isLoading,
+                        onCancel = { onCancelRoleRequest(request.id) }
                     )
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
-            Button(
-                onClick = onRequestTester,
-                enabled = !isLoading && !hasPendingTesterRequest,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(if (hasPendingTesterRequest) "Заявка отправлена" else "Запросить роль тестера")
+            if (groupChangeRequests.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                groupChangeRequests.forEach { request ->
+                    GroupChangeRequestRow(
+                        request = request,
+                        isLoading = isLoading,
+                        onCancel = { onCancelGroupChangeRequest(request.id) }
+                    )
+                }
+            }
+
+            if (canRequestTester) {
+                Spacer(Modifier.height(12.dp))
+                Button(
+                    onClick = onRequestTester,
+                    enabled = !isLoading && !hasPendingTesterRequest,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(if (hasPendingTesterRequest) "Заявка тестера отправлена" else "Запросить роль тестера")
+                }
             }
         }
+    }
+}
+
+@Composable
+fun UserRoleRequestRow(
+    request: RoleRequest,
+    isLoading: Boolean,
+    onCancel: () -> Unit
+) {
+    RequestStatusRow(
+        title = "Роль: ${roleTitle(request.roleType)}",
+        subtitle = request.comment ?: request.createdAt,
+        status = request.status,
+        reviewComment = request.reviewComment,
+        isLoading = isLoading,
+        onCancel = onCancel
+    )
+}
+
+@Composable
+fun GroupChangeRequestRow(
+    request: GroupChangeRequestDto,
+    isLoading: Boolean,
+    onCancel: () -> Unit
+) {
+    val currentGroup = request.currentGroupName ?: request.currentGroupId?.toString() ?: "не выбрана"
+    val requestedGroup = request.requestedGroupName ?: request.requestedGroupId.toString()
+    RequestStatusRow(
+        title = "Смена группы",
+        subtitle = "$currentGroup -> $requestedGroup",
+        status = request.status,
+        reviewComment = request.reviewComment,
+        isLoading = isLoading,
+        onCancel = onCancel
+    )
+}
+
+@Composable
+fun RequestStatusRow(
+    title: String,
+    subtitle: String,
+    status: String,
+    reviewComment: String?,
+    isLoading: Boolean,
+    onCancel: () -> Unit
+) {
+    val normalizedStatus = status.lowercase()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Surface(
+                color = requestStatusColor(normalizedStatus),
+                shape = RoundedCornerShape(6.dp)
+            ) {
+                Text(
+                    text = requestStatusText(normalizedStatus),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
+        }
+
+        if (!reviewComment.isNullOrBlank()) {
+            Text(
+                text = reviewComment,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
+
+        if (normalizedStatus == "pending") {
+            TextButton(
+                onClick = onCancel,
+                enabled = !isLoading,
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text("Отменить")
+            }
+        }
+    }
+}
+
+@Composable
+fun requestStatusColor(status: String): Color {
+    return when (status) {
+        "approved" -> MaterialTheme.colorScheme.primaryContainer
+        "rejected" -> MaterialTheme.colorScheme.errorContainer
+        "cancelled" -> MaterialTheme.colorScheme.surfaceVariant
+        else -> MaterialTheme.colorScheme.secondaryContainer
+    }
+}
+
+fun requestStatusText(status: String): String {
+    return when (status) {
+        "approved" -> "Одобрена"
+        "rejected" -> "Отклонена"
+        "cancelled" -> "Отменена"
+        else -> "На рассмотрении"
+    }
+}
+
+fun roleTitle(role: String): String {
+    return when (role) {
+        "tester" -> "тестер"
+        "group_leader" -> "староста"
+        "moderator" -> "модератор"
+        "premium" -> "Premium"
+        "plus" -> "Plus"
+        else -> role
     }
 }
 
@@ -367,7 +512,7 @@ fun AccountOption(icon: androidx.compose.ui.graphics.vector.ImageVector, title: 
     ListItem(
         headlineContent = { Text(title) },
         leadingContent = { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
-        trailingContent = { Icon(Icons.Default.KeyboardArrowRight, contentDescription = null) },
+        trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
         modifier = Modifier.clickable(onClick = onClick)
     )
 }

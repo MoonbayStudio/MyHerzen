@@ -15,6 +15,7 @@ from app.main import (
     get_user_plan, is_owner, has_permission,
     RoleAuditLog
 )
+from app.db.models import GroupChangeRequest, RoleRequest, UserSettings
 
 engine = create_engine(
     "sqlite:///:memory:",
@@ -174,3 +175,64 @@ def test_cannot_remove_last_admin():
     response = client.post("/admin/roles/revoke", json={"user_id": admin.id, "role": "admin"}, headers=headers)
     assert response.status_code == 403
     assert response.json()["detail"] == "Cannot revoke admin from yourself as the last admin"
+
+
+def test_user_can_cancel_pending_role_request():
+    db = TestingSessionLocal()
+    user = _test_user("requester@example.com")
+    db.add(user)
+    db.commit()
+
+    request = RoleRequest(
+        user_id=user.id,
+        user_email="requester@example.com",
+        role_type="tester",
+        status="pending",
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+
+    response = client.post(
+        f"/role-requests/{request.id}/cancel",
+        headers=get_auth_headers(user.id),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelled"
+
+    db.refresh(request)
+    assert request.status == "cancelled"
+
+
+def test_user_can_cancel_pending_group_change_request():
+    db = TestingSessionLocal()
+    user = _test_user("group-change@example.com")
+    db.add(user)
+    db.commit()
+    db.add(UserSettings(user_id=user.id, selected_group_id=101, selected_group_name="Группа 101"))
+    db.commit()
+
+    request = GroupChangeRequest(
+        user_id=user.id,
+        user_email="group-change@example.com",
+        current_group_id=101,
+        current_group_name="Группа 101",
+        requested_group_id=202,
+        requested_group_name="Группа 202",
+        status="pending",
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+
+    response = client.post(
+        f"/group-change-requests/{request.id}/cancel",
+        headers=get_auth_headers(user.id),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "cancelled"
+
+    db.refresh(request)
+    assert request.status == "cancelled"

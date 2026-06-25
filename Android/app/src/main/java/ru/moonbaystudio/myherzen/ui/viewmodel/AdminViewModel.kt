@@ -67,9 +67,9 @@ class AdminViewModel @Inject constructor(
         }
     }
 
-    fun rejectRequest(requestId: Int) {
+    fun rejectRequest(requestId: Int, comment: String? = null) {
         viewModelScope.launch {
-            authRepository.rejectRoleRequest(requestId).onSuccess { loadAllData() }
+            authRepository.rejectRoleRequest(requestId, comment).onSuccess { loadAllData() }
         }
     }
 
@@ -79,9 +79,9 @@ class AdminViewModel @Inject constructor(
         }
     }
 
-    fun rejectGroupChangeRequest(requestId: Int) {
+    fun rejectGroupChangeRequest(requestId: Int, comment: String? = null) {
         viewModelScope.launch {
-            authRepository.rejectGroupChangeRequest(requestId).onSuccess { loadAllData() }
+            authRepository.rejectGroupChangeRequest(requestId, comment).onSuccess { loadAllData() }
         }
     }
 
