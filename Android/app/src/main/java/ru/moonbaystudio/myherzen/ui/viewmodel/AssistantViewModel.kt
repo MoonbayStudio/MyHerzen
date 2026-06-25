@@ -16,6 +16,7 @@ import ru.moonbaystudio.myherzen.data.model.AssistantPersona
 import ru.moonbaystudio.myherzen.data.remote.MyHerzenApiService
 import ru.moonbaystudio.myherzen.data.remote.dto.*
 import ru.moonbaystudio.myherzen.data.repository.ScheduleRepository
+import ru.moonbaystudio.myherzen.data.repository.RuntimeConfigRepository
 import ru.moonbaystudio.myherzen.util.AssistantPromptBuilder
 import ru.moonbaystudio.myherzen.util.AssistantScheduleContextBuilder
 import java.text.SimpleDateFormat
@@ -26,7 +27,8 @@ import javax.inject.Inject
 class AssistantViewModel @Inject constructor(
     private val apiService: MyHerzenApiService,
     private val scheduleRepository: ScheduleRepository,
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val runtimeConfigRepository: RuntimeConfigRepository
 ) : ViewModel() {
 
     private val gson = Gson()
@@ -41,6 +43,10 @@ class AssistantViewModel @Inject constructor(
 
     private val _selectedPersona = MutableStateFlow(AssistantPersona.PELIKASHA)
     val selectedPersona: StateFlow<AssistantPersona> = _selectedPersona.asStateFlow()
+
+    val runtimeConfigState = runtimeConfigRepository.state
+    private val _remainingRequests = MutableStateFlow<Int?>(null)
+    val remainingRequests: StateFlow<Int?> = _remainingRequests.asStateFlow()
 
     private val conversationId = UUID.randomUUID().toString()
     private val requestDateFormatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
@@ -85,6 +91,17 @@ class AssistantViewModel @Inject constructor(
         saveHistory()
 
         viewModelScope.launch {
+            runtimeConfigRepository.refresh()
+            val runtimeConfig = runtimeConfigRepository.state.value.config
+            if (!runtimeConfig.aiEnabled) {
+                _messages.value += AssistantMessage(
+                    role = AssistantMessage.Role.SYSTEM_LOCAL,
+                    text = "AI временно отключен администратором."
+                )
+                saveHistory()
+                return@launch
+            }
+
             _isLoading.value = true
             try {
                 val groupId = userPreferences.selectedGroupId.first()
@@ -134,6 +151,7 @@ class AssistantViewModel @Inject constructor(
                 val response = apiService.assistantChat(request)
                 if (response.isSuccessful) {
                     response.body()?.let {
+                        _remainingRequests.value = it.remaining
                         _messages.value += AssistantMessage(role = AssistantMessage.Role.ASSISTANT, text = it.reply, persona = _selectedPersona.value)
                         saveHistory()
                     }

@@ -26,6 +26,7 @@ fun SettingsScreen(
 ) {
     val defaultPersona by viewModel.defaultPersona.collectAsState()
     val scheduleCacheWeeks by viewModel.scheduleCacheWeeks.collectAsState()
+    val offlineScheduleEnabled by viewModel.offlineScheduleEnabled.collectAsState()
     val liveActivityEnabled by viewModel.liveActivityEnabled.collectAsState()
 
     Scaffold(
@@ -87,13 +88,24 @@ fun SettingsScreen(
             item {
                 Text("Данные", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp))
                 ListItem(
-                    headlineContent = { Text("Кэш на недель: $scheduleCacheWeeks") },
+                    headlineContent = { Text("Офлайн-кэш расписания") },
+                    supportingContent = { Text("Сохранять пары локально для работы без сети") },
+                    trailingContent = {
+                        Switch(
+                            checked = offlineScheduleEnabled,
+                            onCheckedChange = { viewModel.updateOfflineScheduleEnabled(it) }
+                        )
+                    }
+                )
+                ListItem(
+                    headlineContent = { Text(if (scheduleCacheWeeks == 0) "Кэш выключен" else "Кэш на недель: $scheduleCacheWeeks") },
                     supportingContent = {
                         Slider(
                             value = scheduleCacheWeeks.toFloat(),
                             onValueChange = { viewModel.updateScheduleCacheWeeks(it.toInt()) },
-                            valueRange = 1f..4f,
-                            steps = 2
+                            valueRange = 0f..4f,
+                            steps = 3,
+                            enabled = offlineScheduleEnabled
                         )
                     }
                 )

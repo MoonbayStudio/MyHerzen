@@ -35,8 +35,10 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
     // Cache & Live Activity
     private val SCHEDULE_CACHE_WEEKS_KEY = intPreferencesKey("schedule_cache_weeks")
     private val LIVE_ACTIVITY_ENABLED_KEY = booleanPreferencesKey("live_activity_enabled")
+    private val OFFLINE_SCHEDULE_ENABLED_KEY = booleanPreferencesKey("offline_schedule_enabled")
     private val ONBOARDING_COMPLETED_KEY = booleanPreferencesKey("onboarding_completed")
     private val ASSISTANT_HISTORY_KEY = stringPreferencesKey("assistant_chat_history")
+    private val DISMISSED_SYSTEM_NOTICE_ID_KEY = intPreferencesKey("dismissed_system_notice_id")
 
     val authToken: Flow<String?> = context.dataStore.data.map { it[TOKEN_KEY] }
     val selectedGroupId: Flow<Int?> = context.dataStore.data.map { it[GROUP_ID_KEY] }
@@ -55,8 +57,10 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
     
     val scheduleCacheWeeks: Flow<Int> = context.dataStore.data.map { it[SCHEDULE_CACHE_WEEKS_KEY] ?: 2 }
     val liveActivityEnabled: Flow<Boolean> = context.dataStore.data.map { it[LIVE_ACTIVITY_ENABLED_KEY] ?: true }
+    val offlineScheduleEnabled: Flow<Boolean> = context.dataStore.data.map { it[OFFLINE_SCHEDULE_ENABLED_KEY] ?: ((it[SCHEDULE_CACHE_WEEKS_KEY] ?: 2) > 0) }
     val onboardingCompleted: Flow<Boolean> = context.dataStore.data.map { it[ONBOARDING_COMPLETED_KEY] ?: false }
     val assistantHistory: Flow<String?> = context.dataStore.data.map { it[ASSISTANT_HISTORY_KEY] }
+    val dismissedSystemNoticeId: Flow<Int?> = context.dataStore.data.map { it[DISMISSED_SYSTEM_NOTICE_ID_KEY] }
     
     val deviceId: Flow<String> = context.dataStore.data.map { 
         it[DEVICE_ID_KEY] ?: run {
@@ -101,6 +105,7 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
                 }
             }
             it[SCHEDULE_CACHE_WEEKS_KEY] = scheduleCacheWeeks.coerceIn(0, 4)
+            it[OFFLINE_SCHEDULE_ENABLED_KEY] = scheduleCacheWeeks > 0
             it[LIVE_ACTIVITY_ENABLED_KEY] = liveActivityEnabled
         }
     }
@@ -145,11 +150,27 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
     }
 
     suspend fun updateScheduleCacheWeeks(weeks: Int) {
-        context.dataStore.edit { it[SCHEDULE_CACHE_WEEKS_KEY] = weeks }
+        context.dataStore.edit {
+            val normalizedWeeks = weeks.coerceIn(0, 4)
+            it[SCHEDULE_CACHE_WEEKS_KEY] = normalizedWeeks
+            it[OFFLINE_SCHEDULE_ENABLED_KEY] = normalizedWeeks > 0
+        }
     }
 
     suspend fun updateLiveActivityEnabled(enabled: Boolean) {
         context.dataStore.edit { it[LIVE_ACTIVITY_ENABLED_KEY] = enabled }
+    }
+
+    suspend fun updateOfflineScheduleEnabled(enabled: Boolean) {
+        context.dataStore.edit {
+            it[OFFLINE_SCHEDULE_ENABLED_KEY] = enabled
+            val currentWeeks = it[SCHEDULE_CACHE_WEEKS_KEY] ?: 2
+            if (enabled && currentWeeks == 0) {
+                it[SCHEDULE_CACHE_WEEKS_KEY] = 2
+            } else if (!enabled) {
+                it[SCHEDULE_CACHE_WEEKS_KEY] = 0
+            }
+        }
     }
 
     suspend fun setOnboardingCompleted(completed: Boolean) {
@@ -162,6 +183,10 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
 
     suspend fun clearAssistantHistory() {
         context.dataStore.edit { it.remove(ASSISTANT_HISTORY_KEY) }
+    }
+
+    suspend fun saveDismissedSystemNoticeId(id: Int) {
+        context.dataStore.edit { it[DISMISSED_SYSTEM_NOTICE_ID_KEY] = id }
     }
 
     private suspend fun saveDeviceId(id: String) {

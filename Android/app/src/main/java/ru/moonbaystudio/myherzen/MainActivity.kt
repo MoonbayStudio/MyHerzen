@@ -18,6 +18,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -38,6 +43,7 @@ import ru.moonbaystudio.myherzen.ui.screens.AccountScreen
 import ru.moonbaystudio.myherzen.ui.screens.AccountSessionsScreen
 import ru.moonbaystudio.myherzen.ui.screens.AdminPanelScreen
 import ru.moonbaystudio.myherzen.ui.viewmodel.AdminViewModel
+import ru.moonbaystudio.myherzen.ui.viewmodel.RuntimeConfigViewModel
 import ru.moonbaystudio.myherzen.ui.screens.AssistantScreen
 import ru.moonbaystudio.myherzen.ui.screens.EmailChangeScreen
 import ru.moonbaystudio.myherzen.ui.screens.GroupMembersScreen
@@ -135,6 +141,9 @@ fun AppNavigation(selectedGroupId: Int?, scheduleGroupId: Int?, onboardingComple
     if (onboardingCompleted == null) return // Wait for preferences to load
 
     val navController = rememberNavController()
+    val runtimeConfigViewModel: RuntimeConfigViewModel = hiltViewModel()
+    val runtimeState by runtimeConfigViewModel.state.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
     val startDestination = if (onboardingCompleted == false) "onboarding"
                           else if (scheduleGroupId != null) Screen.Schedule.route
                           else "group_selection"
@@ -146,6 +155,16 @@ fun AppNavigation(selectedGroupId: Int?, scheduleGroupId: Int?, onboardingComple
         Screen.Account,
         Screen.Menu
     )
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_START) {
+                runtimeConfigViewModel.refresh()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         NavHost(
@@ -271,6 +290,99 @@ fun AppNavigation(selectedGroupId: Int?, scheduleGroupId: Int?, onboardingComple
                 navController = navController,
                 items = items
             )
+        }
+
+        RuntimeNoticeOverlay(
+            state = runtimeState,
+            onDismissNotice = runtimeConfigViewModel::dismissNotice
+        )
+    }
+}
+
+@Composable
+fun RuntimeNoticeOverlay(
+    state: ru.moonbaystudio.myherzen.data.repository.RuntimeConfigState,
+    onDismissNotice: (Int) -> Unit
+) {
+    val notice = state.notice
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        if (state.config.maintenanceMode) {
+            RuntimeBanner(
+                title = "Технические работы",
+                message = "Часть функций может быть временно недоступна.",
+                color = MaterialTheme.colorScheme.errorContainer,
+                onDismiss = null
+            )
+        }
+
+        if (notice != null && notice.showAs == "banner") {
+            RuntimeBanner(
+                title = notice.title,
+                message = notice.message,
+                color = when (notice.type) {
+                    "critical", "maintenance" -> MaterialTheme.colorScheme.errorContainer
+                    "warning" -> MaterialTheme.colorScheme.tertiaryContainer
+                    else -> MaterialTheme.colorScheme.secondaryContainer
+                },
+                onDismiss = if (notice.dismissible) ({ onDismissNotice(notice.id) }) else null
+            )
+        }
+    }
+
+    if (notice != null && notice.showAs == "modal") {
+        AlertDialog(
+            onDismissRequest = {
+                if (notice.dismissible) onDismissNotice(notice.id)
+            },
+            title = { Text(notice.title) },
+            text = { Text(notice.message) },
+            confirmButton = {
+                if (notice.dismissible) {
+                    TextButton(onClick = { onDismissNotice(notice.id) }) {
+                        Text("Понятно")
+                    }
+                }
+            },
+            properties = DialogProperties(dismissOnBackPress = notice.dismissible, dismissOnClickOutside = notice.dismissible)
+        )
+    }
+}
+
+@Composable
+private fun RuntimeBanner(
+    title: String,
+    message: String,
+    color: Color,
+    onDismiss: (() -> Unit)?
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = color,
+        tonalElevation = 6.dp,
+        shadowElevation = 8.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(2.dp))
+                Text(message, style = MaterialTheme.typography.bodyMedium)
+            }
+            if (onDismiss != null) {
+                IconButton(onClick = onDismiss) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Закрыть")
+                }
+            }
         }
     }
 }

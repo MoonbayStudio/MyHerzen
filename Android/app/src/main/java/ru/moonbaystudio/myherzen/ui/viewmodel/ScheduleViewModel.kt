@@ -72,10 +72,7 @@ class ScheduleViewModel @Inject constructor(
         if (state.id != null) {
             repository.getScheduleFlow(state.id, state.date, state.examOnly)
                 .map { local ->
-                    // Priority: Local Cache > Temporary remote items
-                    if (local.isNotEmpty()) local
-                    else if (state.tempItems != null) state.tempItems
-                    else emptyList()
+                    state.tempItems ?: local
                 }
                 .scan(emptyList<ScheduleItem>()) { previous, next ->
                     // If next is empty but we are loading OR we had data and Room hasn't emitted yet, keep previous
@@ -161,7 +158,12 @@ class ScheduleViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                val cacheWeeks = settingsRepository.scheduleCacheWeeks.first().coerceIn(1, 4)
+                val offlineScheduleEnabled = settingsRepository.offlineScheduleEnabled.first()
+                val cacheWeeks = if (offlineScheduleEnabled) {
+                    settingsRepository.scheduleCacheWeeks.first().coerceIn(1, 4)
+                } else {
+                    0
+                }
 
                 if (examOnly) {
                     val hasSession = repository.hasSession(groupId)
@@ -177,7 +179,20 @@ class ScheduleViewModel @Inject constructor(
                     val hasData = repository.hasDataForDate(groupId, date)
                     val maxCached = repository.getMaxCachedDate(groupId)
 
-                    if (!hasData) {
+                    if (!offlineScheduleEnabled) {
+                        _isLoading.value = true
+                        try {
+                            val remoteItems = repository.fetchSchedule(groupId, date, false)
+                            val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date)
+                            _temporaryItems.value = _temporaryItems.value + (dateStr to remoteItems)
+                            _isOffline.value = false
+                        } catch (e: Exception) {
+                            _isOffline.value = true
+                            _refreshStatus.value = RefreshStatus.Error("Ошибка загрузки")
+                        } finally {
+                            _isLoading.value = false
+                        }
+                    } else if (!hasData) {
                         val today = Calendar.getInstance().apply {
                             set(Calendar.HOUR_OF_DAY, 0)
                             set(Calendar.MINUTE, 0)
@@ -213,7 +228,7 @@ class ScheduleViewModel @Inject constructor(
                         }
                     }
 
-                    if (maxCached != null) {
+                    if (offlineScheduleEnabled && maxCached != null) {
                         val maxDateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(maxCached)
                         val currentDateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(date)
 

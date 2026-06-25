@@ -21,8 +21,13 @@ class SettingsViewModel @Inject constructor(
     val selectedThemeId = userPreferences.selectedThemeId.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "classic")
     val scheduleCacheWeeks = userPreferences.scheduleCacheWeeks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 2)
     val liveActivityEnabled = userPreferences.liveActivityEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val offlineScheduleEnabled = userPreferences.offlineScheduleEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val reduceMotion = userPreferences.reduceMotion.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val highContrast = userPreferences.highContrast.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
     val largerText = userPreferences.largerText.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val autoSpeakSchedule = userPreferences.autoSpeakSchedule.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    val speechDetailed = userPreferences.speechDetailed.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val hapticsEnabled = userPreferences.hapticsEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
 
     fun updateDefaultPersona(persona: String) = viewModelScope.launch {
         userPreferences.updateDefaultPersona(persona)
@@ -32,8 +37,24 @@ class SettingsViewModel @Inject constructor(
         userPreferences.updateHighContrast(enabled)
     }
 
+    fun updateReduceMotion(enabled: Boolean) = viewModelScope.launch {
+        userPreferences.updateReduceMotion(enabled)
+    }
+
     fun updateLargerText(enabled: Boolean) = viewModelScope.launch {
         userPreferences.updateLargerText(enabled)
+    }
+
+    fun updateAutoSpeakSchedule(enabled: Boolean) = viewModelScope.launch {
+        userPreferences.updateAutoSpeakSchedule(enabled)
+    }
+
+    fun updateSpeechDetailed(enabled: Boolean) = viewModelScope.launch {
+        userPreferences.updateSpeechDetailed(enabled)
+    }
+
+    fun updateHapticsEnabled(enabled: Boolean) = viewModelScope.launch {
+        userPreferences.updateHapticsEnabled(enabled)
     }
 
     fun updateTheme(themeId: String) = viewModelScope.launch {
@@ -42,6 +63,10 @@ class SettingsViewModel @Inject constructor(
 
     fun updateScheduleCacheWeeks(weeks: Int) = viewModelScope.launch {
         userPreferences.updateScheduleCacheWeeks(weeks)
+    }
+
+    fun updateOfflineScheduleEnabled(enabled: Boolean) = viewModelScope.launch {
+        userPreferences.updateOfflineScheduleEnabled(enabled)
     }
 
     fun updateLiveActivityEnabled(enabled: Boolean) = viewModelScope.launch {

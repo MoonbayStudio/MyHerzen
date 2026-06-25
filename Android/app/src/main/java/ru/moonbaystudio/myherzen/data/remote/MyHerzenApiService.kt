@@ -6,6 +6,12 @@ import retrofit2.http.*
 import ru.moonbaystudio.myherzen.data.remote.dto.*
 
 interface MyHerzenApiService {
+    @GET("config/public")
+    suspend fun getPublicConfig(): Response<PublicConfigResponse>
+
+    @GET("system/notice")
+    suspend fun getActiveSystemNotice(): Response<ActiveSystemNoticeResponse>
+
     @POST("auth/login")
     suspend fun login(@Body request: PasswordLoginRequest): Response<AppleSignInResponse>
 

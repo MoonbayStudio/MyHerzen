@@ -45,7 +45,7 @@ fun AccountScreen(
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val currentUser by viewModel.currentUser.collectAsState()
-    val isLoggedIn by viewModel.isLoggedIn.collectAsState(initial = true)
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState(initial = false)
     val isLoading by viewModel.isLoading.collectAsState()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()

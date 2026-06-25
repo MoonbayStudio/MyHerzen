@@ -37,6 +37,9 @@ fun AssistantScreen(
     val inputText by viewModel.inputText.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val selectedPersona by viewModel.selectedPersona.collectAsState()
+    val runtimeState by viewModel.runtimeConfigState.collectAsState()
+    val remainingRequests by viewModel.remainingRequests.collectAsState()
+    val aiEnabled = runtimeState.config.aiEnabled
 
     // Sync persona with default from preferences if first time
     val settingsViewModel: SettingsViewModel = hiltViewModel()
@@ -91,37 +94,57 @@ fun AssistantScreen(
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f),
                     tonalElevation = 2.dp
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
                             .padding(horizontal = 16.dp, vertical = 4.dp)
                             .fillMaxWidth()
                             .navigationBarsPadding()
                             .imePadding(),
-                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        TextField(
-                            value = inputText,
-                            onValueChange = { viewModel.setInputText(it) },
-                            modifier = Modifier.weight(1f),
-                            placeholder = { Text("Спросить Пеликашу...") },
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent,
-                            ),
-                            maxLines = 4,
-                            enabled = !isLoading
-                        )
-                        IconButton(
-                            onClick = { viewModel.sendMessage() },
-                            enabled = inputText.isNotBlank() && !isLoading
+                        val limitText = when {
+                            !aiEnabled -> "AI временно отключен администратором"
+                            remainingRequests != null && runtimeState.config.aiDailyLimit != null ->
+                                "Осталось ${remainingRequests} из ${runtimeState.config.aiDailyLimit} запросов"
+                            remainingRequests != null -> "Осталось запросов: ${remainingRequests}"
+                            runtimeState.config.aiDailyLimit != null -> "Лимит на день: ${runtimeState.config.aiDailyLimit}"
+                            else -> null
+                        }
+                        if (limitText != null) {
+                            Text(
+                                text = limitText,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = if (aiEnabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 2.dp)
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            if (isLoading) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                            } else {
-                                Icon(imageVector = Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
+                            TextField(
+                                value = inputText,
+                                onValueChange = { viewModel.setInputText(it) },
+                                modifier = Modifier.weight(1f),
+                                placeholder = { Text(if (aiEnabled) "Спросить Пеликашу..." else "AI отключен") },
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent,
+                                    disabledContainerColor = Color.Transparent,
+                                    focusedIndicatorColor = Color.Transparent,
+                                    unfocusedIndicatorColor = Color.Transparent,
+                                ),
+                                maxLines = 4,
+                                enabled = !isLoading && aiEnabled
+                            )
+                            IconButton(
+                                onClick = { viewModel.sendMessage() },
+                                enabled = inputText.isNotBlank() && !isLoading && aiEnabled
+                            ) {
+                                if (isLoading) {
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                } else {
+                                    Icon(imageVector = Icons.AutoMirrored.Filled.Send, contentDescription = "Send", tint = MaterialTheme.colorScheme.primary)
+                                }
                             }
                         }
                     }

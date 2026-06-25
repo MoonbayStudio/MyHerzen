@@ -280,18 +280,73 @@ fun RequestListItem(request: AdminRoleRequestDto, onApprove: () -> Unit, onRejec
 
 @Composable
 fun SettingItem(setting: AdminRuntimeSetting, onUpdate: (Any) -> Unit) {
+    var showEditDialog by remember { mutableStateOf(false) }
+
+    if (showEditDialog) {
+        RuntimeSettingEditDialog(
+            setting = setting,
+            onDismiss = { showEditDialog = false },
+            onConfirm = {
+                onUpdate(it)
+                showEditDialog = false
+            }
+        )
+    }
+
     ListItem(
         headlineContent = { Text(setting.key, fontWeight = FontWeight.Medium) },
-        supportingContent = { Text(setting.value.toString()) },
+        supportingContent = { Text(setting.description ?: setting.value.toString()) },
         trailingContent = {
             val valueAny = setting.value
             if (valueAny is Boolean) {
                 Switch(checked = valueAny, onCheckedChange = { onUpdate(it) })
             } else {
-                IconButton(onClick = { /* TODO */ }) {
+                IconButton(onClick = { showEditDialog = true }) {
                     Icon(imageVector = Icons.Default.Edit, contentDescription = null)
                 }
             }
+        }
+    )
+}
+
+@Composable
+fun RuntimeSettingEditDialog(
+    setting: AdminRuntimeSetting,
+    onDismiss: () -> Unit,
+    onConfirm: (Any) -> Unit
+) {
+    var text by remember(setting.key) { mutableStateOf(setting.value.toString()) }
+    val expectsInt = setting.valueType == "int" || setting.value is Number
+    val parsedValue: Any? = if (expectsInt) text.toIntOrNull() else text
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(setting.key) },
+        text = {
+            Column {
+                if (!setting.description.isNullOrBlank()) {
+                    Text(setting.description, style = MaterialTheme.typography.bodySmall)
+                    Spacer(Modifier.height(8.dp))
+                }
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    label = { Text(if (expectsInt) "Число" else "Значение") },
+                    isError = parsedValue == null,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = parsedValue != null,
+                onClick = { parsedValue?.let(onConfirm) }
+            ) {
+                Text("Сохранить")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Отмена") }
         }
     )
 }

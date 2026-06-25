@@ -34,7 +34,7 @@ object NetworkModule {
                 val token = runBlocking { userPreferences.authToken.first() }
                 request.newBuilder().apply {
                     if (token != null) {
-                        addHeader("Authorization", "Bearer $token")
+                        header("Authorization", "Bearer $token")
                     }
                 }.build()
             } else {

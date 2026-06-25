@@ -31,12 +31,16 @@ class AuthRepository @Inject constructor(
             deviceName = android.os.Build.MODEL,
             appVersion = "1.0"
         )
-        return safeApiCall { apiService.login(request) }.toResult().map { body ->
-            userPreferences.saveAuthToken(body.token)
-            _currentUser.value = body.user
-            syncLocalSelectedGroup()
-            Unit
-        }
+        val result = safeApiCall { apiService.login(request) }.toResult()
+        return result.fold(
+            onSuccess = { body ->
+                userPreferences.saveAuthToken(body.token)
+                _currentUser.value = body.user
+                syncLocalSelectedGroup()
+                Result.success(Unit)
+            },
+            onFailure = { Result.failure(it) }
+        )
     }
 
     suspend fun register(name: String, email: String, password: String): Result<Unit> {
@@ -57,12 +61,16 @@ class AuthRepository @Inject constructor(
             deviceName = android.os.Build.MODEL,
             appVersion = "1.0"
         )
-        return safeApiCall { apiService.signupVerify(request) }.toResult().map { body ->
-            userPreferences.saveAuthToken(body.token)
-            _currentUser.value = body.user
-            syncLocalSelectedGroup()
-            Unit
-        }
+        val result = safeApiCall { apiService.signupVerify(request) }.toResult()
+        return result.fold(
+            onSuccess = { body ->
+                userPreferences.saveAuthToken(body.token)
+                _currentUser.value = body.user
+                syncLocalSelectedGroup()
+                Result.success(Unit)
+            },
+            onFailure = { Result.failure(it) }
+        )
     }
 
     suspend fun googleLogin(idToken: String): Result<Unit> {
@@ -74,12 +82,16 @@ class AuthRepository @Inject constructor(
             appVersion = "1.0",
             systemVersion = android.os.Build.VERSION.RELEASE
         )
-        return safeApiCall { apiService.googleLogin(request) }.toResult().map { body ->
-            userPreferences.saveAuthToken(body.token)
-            _currentUser.value = body.user
-            syncLocalSelectedGroup()
-            Unit
-        }
+        val result = safeApiCall { apiService.googleLogin(request) }.toResult()
+        return result.fold(
+            onSuccess = { body ->
+                userPreferences.saveAuthToken(body.token)
+                _currentUser.value = body.user
+                syncLocalSelectedGroup()
+                Result.success(Unit)
+            },
+            onFailure = { Result.failure(it) }
+        )
     }
 
     suspend fun linkGoogle(idToken: String): Result<AppleUser> {
@@ -91,9 +103,8 @@ class AuthRepository @Inject constructor(
             appVersion = "1.0",
             systemVersion = android.os.Build.VERSION.RELEASE
         )
-        return safeApiCall { apiService.linkGoogle(request) }.toResult().also { result ->
-            result.onSuccess { _currentUser.value = it }
-        }
+        val result = safeApiCall { apiService.linkGoogle(request) }.toResult()
+        return result.onSuccess { _currentUser.value = it }
     }
 
     suspend fun logout() {
@@ -102,7 +113,7 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun refreshUser() {
-        safeApiCall { apiService.getProfile() }.onSuccess {
+        safeApiCall { apiService.getProfile() }.toResult().onSuccess {
             _currentUser.value = it
         }
     }
@@ -110,7 +121,7 @@ class AuthRepository @Inject constructor(
     suspend fun updateProfile(name: String): Result<AppleUser> {
         return safeApiCall { apiService.updateProfile(UpdateProfileRequest(name)) }
             .toResult()
-            .also { result -> result.onSuccess { _currentUser.value = it } }
+            .onSuccess { _currentUser.value = it }
     }
 
     suspend fun createPassword(password: String): Result<Unit> {
@@ -128,11 +139,11 @@ class AuthRepository @Inject constructor(
     suspend fun confirmEmailChange(code: String): Result<AppleUser> {
         return safeApiCall { apiService.confirmEmailChange(EmailConfirmRequest(code)) }
             .toResult()
-            .also { result -> result.onSuccess { _currentUser.value = it } }
+            .onSuccess { _currentUser.value = it }
     }
 
     suspend fun getSessions(): List<AccountSession> {
-        return safeApiCall { apiService.getSessions() }.getOrElse { emptyList() }
+        return safeApiCall { apiService.getSessions() }.toResult().getOrElse { emptyList() }
     }
 
     suspend fun revokeSession(sessionId: String): Result<Unit> {
@@ -144,7 +155,7 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun getMyRoleRequests(): List<RoleRequest> {
-        return safeApiCall { apiService.getMyRoleRequests() }.getOrElse { emptyList() }
+        return safeApiCall { apiService.getMyRoleRequests() }.toResult().getOrElse { emptyList() }
     }
 
     suspend fun createRoleRequest(type: String, groupId: Int?, groupName: String?, comment: String?): Result<RoleRequest> {
@@ -160,19 +171,19 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun getGroupUsers(groupId: Int): List<GroupUserDto> {
-        return safeApiCall { apiService.getGroupUsers(groupId) }.getOrElse { emptyList() }
+        return safeApiCall { apiService.getGroupUsers(groupId) }.toResult().getOrElse { emptyList() }
     }
 
     suspend fun getAdminUsers(): List<AdminUserDto> {
-        return safeApiCall { apiService.getAdminUsers() }.getOrElse { emptyList() }
+        return safeApiCall { apiService.getAdminUsers() }.toResult().getOrElse { emptyList() }
     }
 
     suspend fun getAdminRoleRequests(status: String): List<AdminRoleRequestDto> {
-        return safeApiCall { apiService.getAdminRoleRequests(status) }.getOrElse { emptyList() }
+        return safeApiCall { apiService.getAdminRoleRequests(status) }.toResult().getOrElse { emptyList() }
     }
 
     suspend fun getGroupChangeRequests(status: String): List<GroupChangeRequestDto> {
-        return safeApiCall { apiService.getGroupChangeRequests(status) }.getOrElse { emptyList() }
+        return safeApiCall { apiService.getGroupChangeRequests(status) }.toResult().getOrElse { emptyList() }
     }
 
     suspend fun approveRoleRequest(requestId: Int): Result<Unit> {
@@ -202,7 +213,7 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun getAdminBadges(): List<BadgeDto> {
-        return safeApiCall { apiService.getAdminBadges() }.getOrElse { emptyList() }
+        return safeApiCall { apiService.getAdminBadges() }.toResult().getOrElse { emptyList() }
     }
 
     suspend fun grantBadge(userId: String, badgeCode: String, note: String?): Result<AdminUserDto> {
@@ -214,7 +225,7 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun getAdminSettings(): List<AdminRuntimeSetting> {
-        return safeApiCall { apiService.getAdminSettings() }.getOrElse { emptyList() }
+        return safeApiCall { apiService.getAdminSettings() }.toResult().getOrElse { emptyList() }
     }
 
     suspend fun updateAdminSetting(key: String, value: Any): Result<AdminRuntimeSetting> {
@@ -222,7 +233,7 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun getAdminSystemNotices(): List<SystemNotice> {
-        return safeApiCall { apiService.getAdminSystemNotices() }.getOrElse { emptyList() }
+        return safeApiCall { apiService.getAdminSystemNotices() }.toResult().getOrElse { emptyList() }
     }
 
     suspend fun createAdminSystemNotice(request: SystemNoticeMutationRequest): Result<SystemNotice> {
@@ -246,7 +257,7 @@ class AuthRepository @Inject constructor(
     }
 
     suspend fun getAdminUserSessions(userId: String): List<AccountSession> {
-        return safeApiCall { apiService.getAdminUserSessions(userId) }.getOrElse { emptyList() }
+        return safeApiCall { apiService.getAdminUserSessions(userId) }.toResult().getOrElse { emptyList() }
     }
 
     suspend fun revokeAdminSession(sessionId: String): Result<Unit> {
@@ -261,7 +272,21 @@ class AuthRepository @Inject constructor(
         return safeApiCall { apiService.confirmPasswordReset(ResetPasswordConfirmRequest(code, newPassword)) }.toResult().map { Unit }
     }
 
+    suspend fun pushLocalSettingsToAccount(): Result<Unit> {
+        val groupId = userPreferences.selectedGroupId.first() ?: return Result.success(Unit)
+        val groupName = userPreferences.selectedGroupName.first() ?: groupId.toString()
+        val settings = UserSettings(
+            selectedGroupId = groupId,
+            selectedGroupName = groupName,
+            scheduleCacheWeeks = userPreferences.scheduleCacheWeeks.first(),
+            liveActivityEnabled = userPreferences.liveActivityEnabled.first()
+        )
+        return safeApiCall { apiService.updateSettings(settings) }.toResult().map { Unit }
+    }
+
     suspend fun syncLocalSelectedGroup() {
+        // Небольшая задержка, чтобы токен точно прописался в заголовках OkHttp
+        kotlinx.coroutines.delay(100)
         val remoteSettings = when (val result = safeApiCall { apiService.getSettings() }) {
             is NetworkResult.Success -> result.data
             else -> null
@@ -270,59 +295,21 @@ class AuthRepository @Inject constructor(
         if (remoteSettings?.selectedGroupId != null) {
             userPreferences.saveUserSettings(
                 selectedGroupId = remoteSettings.selectedGroupId,
-                selectedGroupName = remoteSettings.selectedGroupName,
+                selectedGroupName = remoteSettings.selectedGroupName ?: remoteSettings.selectedGroupId.toString(),
                 scheduleCacheWeeks = remoteSettings.scheduleCacheWeeks,
                 liveActivityEnabled = remoteSettings.liveActivityEnabled
             )
             return
         }
 
-        val groupId = userPreferences.selectedGroupId.first() ?: run {
-            if (remoteSettings != null) {
-                userPreferences.saveUserSettings(
-                    selectedGroupId = null,
-                    selectedGroupName = null,
-                    scheduleCacheWeeks = remoteSettings.scheduleCacheWeeks,
-                    liveActivityEnabled = remoteSettings.liveActivityEnabled
-                )
-            }
-            return
-        }
+        val groupId = userPreferences.selectedGroupId.first() ?: return
         val groupName = userPreferences.selectedGroupName.first() ?: groupId.toString()
-        val settings = UserSettings(
-            selectedGroupId = groupId,
-            selectedGroupName = groupName,
-            scheduleCacheWeeks = remoteSettings?.scheduleCacheWeeks ?: userPreferences.scheduleCacheWeeks.first(),
-            liveActivityEnabled = remoteSettings?.liveActivityEnabled ?: userPreferences.liveActivityEnabled.first()
-        )
-        safeApiCall { apiService.updateSettings(settings) }
-    }
-
-    suspend fun pushLocalSettingsToAccount(): Result<Unit> {
-        val groupId = userPreferences.selectedGroupId.first()
-            ?: return Result.failure(IllegalStateException("Default group is not selected"))
-        val groupName = userPreferences.selectedGroupName.first() ?: groupId.toString()
-        val remoteSettings = when (val result = safeApiCall { apiService.getSettings() }) {
-            is NetworkResult.Success -> result.data
-            else -> null
-        }
-
-        if (remoteSettings?.selectedGroupId != null && remoteSettings.selectedGroupId != groupId) {
-            userPreferences.saveUserSettings(
-                selectedGroupId = remoteSettings.selectedGroupId,
-                selectedGroupName = remoteSettings.selectedGroupName,
-                scheduleCacheWeeks = remoteSettings.scheduleCacheWeeks,
-                liveActivityEnabled = remoteSettings.liveActivityEnabled
-            )
-            return Result.failure(IllegalStateException("Remote default group differs from local group"))
-        }
-
         val settings = UserSettings(
             selectedGroupId = groupId,
             selectedGroupName = groupName,
             scheduleCacheWeeks = userPreferences.scheduleCacheWeeks.first(),
             liveActivityEnabled = userPreferences.liveActivityEnabled.first()
         )
-        return safeApiCall { apiService.updateSettings(settings) }.toResult().map { Unit }
+        safeApiCall { apiService.updateSettings(settings) }
     }
 }

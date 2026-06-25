@@ -24,7 +24,7 @@ class SettingsRepository @Inject constructor(
     val selectedGroupId = userPreferences.selectedGroupId
     val selectedGroupName = userPreferences.selectedGroupName
     val scheduleCacheWeeks = userPreferences.scheduleCacheWeeks
-    val offlineScheduleEnabled = userPreferences.liveActivityEnabled // Assuming this maps to it
+    val offlineScheduleEnabled = userPreferences.offlineScheduleEnabled
     val offlineScheduleWeeks = userPreferences.scheduleCacheWeeks
     val liveActivityEnabled = userPreferences.liveActivityEnabled
 
@@ -96,6 +96,10 @@ class SettingsRepository @Inject constructor(
 
     suspend fun updateScheduleCacheWeeks(weeks: Int) {
         userPreferences.updateScheduleCacheWeeks(weeks)
+    }
+
+    suspend fun updateOfflineScheduleEnabled(enabled: Boolean) {
+        userPreferences.updateOfflineScheduleEnabled(enabled)
     }
 
     suspend fun updateLiveActivityEnabled(enabled: Boolean) {

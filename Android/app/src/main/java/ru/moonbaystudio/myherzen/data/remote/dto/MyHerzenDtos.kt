@@ -64,6 +64,15 @@ data class AssistantChatResponse(
     val plan: String
 )
 
+data class PublicConfigResponse(
+    val settings: Map<String, Any> = emptyMap()
+)
+
+data class ActiveSystemNoticeResponse(
+    @SerializedName("isActive") val isActive: Boolean = false,
+    val notice: SystemNotice? = null
+)
+
 data class PasswordLoginRequest(
     val email: String,
     val password: String,
@@ -235,7 +244,10 @@ data class AccountSession(
 
 data class AdminRuntimeSetting(
     val key: String,
-    val value: Any // Can be Boolean, Int, String
+    val value: Any, // Can be Boolean, Int, String
+    @SerializedName("valueType") val valueType: String? = null,
+    val description: String? = null,
+    @SerializedName("isPublic") val isPublic: Boolean = false
 )
 
 data class SystemNotice(
@@ -243,21 +255,22 @@ data class SystemNotice(
     val title: String,
     val message: String,
     val type: String, // info, warning, maintenance, critical
-    @SerializedName("show_as") val showAs: String, // banner, modal
+    @SerializedName("showAs", alternate = ["show_as"]) val showAs: String, // banner, modal
     val dismissible: Boolean,
-    @SerializedName("starts_at") val startsAt: String?,
-    @SerializedName("ends_at") val endsAt: String?,
-    @SerializedName("is_active") val isActive: Boolean?
+    @SerializedName("startsAt", alternate = ["starts_at"]) val startsAt: String?,
+    @SerializedName("endsAt", alternate = ["ends_at"]) val endsAt: String?,
+    @SerializedName("isActive", alternate = ["is_active"]) val isActive: Boolean?
 )
 
 data class SystemNoticeMutationRequest(
     val title: String,
     val message: String,
     val type: String,
-    @SerializedName("show_as") val showAs: String,
+    @SerializedName("showAs") val showAs: String,
     val dismissible: Boolean,
-    @SerializedName("starts_at") val startsAt: String?,
-    @SerializedName("ends_at") val endsAt: String?
+    @SerializedName("startsAt") val startsAt: String?,
+    @SerializedName("endsAt") val endsAt: String?,
+    @SerializedName("isActive") val isActive: Boolean? = null
 )
 
 data class RoleRequestCreateRequest(
