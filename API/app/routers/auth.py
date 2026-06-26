@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Form
@@ -58,6 +59,11 @@ from app.utils.google_auth import verify_google_token
 
 
 router = APIRouter()
+
+
+def _email_signup_sub(email: str) -> str:
+    email_hash = hashlib.sha256(email.encode("utf-8")).hexdigest()[:20]
+    return f"email:{email_hash}"
 
 
 def _mask_login_email(email: str) -> str:
@@ -435,24 +441,38 @@ async def signup(
     db: Session = Depends(get_db),
 ):
     normalized_email = validate_contact_email(data.email)
-    ensure_contact_email_available(db, normalized_email, None)
     validate_password_strength(data.password)
+    display_name = normalize_optional_string(data.displayName)
+    if display_name is None:
+        raise HTTPException(status_code=400, detail="Display name is required")
 
-    # Create user with "email:" prefix in apple_sub
-    # Using hash of email to keep it short and unique
-    import hashlib
-    email_hash = hashlib.sha256(normalized_email.encode()).hexdigest()[:20]
+    signup_sub = _email_signup_sub(normalized_email)
+    user = db.query(User).filter(User.apple_sub == signup_sub).first()
+    now = datetime.now(timezone.utc)
 
-    user = User(
-        apple_sub=f"email:{email_hash}",
-        display_name=data.displayName.strip(),
-        password_hash=hash_password(data.password),
-        password_created_at=datetime.now(timezone.utc)
-    )
-    db.add(user)
-    db.flush()
+    if user is not None:
+        if user.contact_email_verified:
+            raise HTTPException(status_code=400, detail="Email is already in use")
 
-    # Create verification code
+        ensure_contact_email_available(db, normalized_email, user.id)
+        user.display_name = display_name
+        user.password_hash = hash_password(data.password)
+        if user.password_created_at is None:
+            user.password_created_at = now
+        user.password_updated_at = now
+        user.updated_at = now
+    else:
+        ensure_contact_email_available(db, normalized_email, None)
+        user = User(
+            apple_sub=signup_sub,
+            display_name=display_name,
+            password_hash=hash_password(data.password),
+            password_created_at=now,
+            password_updated_at=now,
+        )
+        db.add(user)
+        db.flush()
+
     code = create_pending_email_verification_code(
         user=user,
         email=normalized_email,
@@ -476,8 +496,8 @@ async def signup_verify(
 
     code_hash = hash_contact_email_token(data.code)
 
-    # Find user by pending email and code
     user = db.query(User).filter(
+        User.apple_sub == _email_signup_sub(normalized_email),
         User.pending_contact_email == normalized_email,
         User.pending_contact_email_token_hash == code_hash
     ).first()
@@ -488,6 +508,8 @@ async def signup_verify(
     expires_at = normalize_datetime(user.pending_contact_email_expires_at)
     if expires_at is None or expires_at <= datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Verification code expired")
+
+    ensure_contact_email_available(db, normalized_email, user.id)
 
     # Verify and activate
     user.contact_email = normalized_email

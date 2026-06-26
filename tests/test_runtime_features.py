@@ -193,6 +193,163 @@ def test_link_google_provider_adds_login_provider(monkeypatch):
     assert provider.user_id == user.id
 
 
+def test_signup_creates_pending_email_verification(monkeypatch):
+    db = TestingSessionLocal()
+    sent_codes = []
+
+    monkeypatch.setattr(
+        "app.routers.auth.send_email_verification_code",
+        lambda email, code: sent_codes.append((email, code)),
+    )
+
+    response = client.post(
+        "/auth/signup",
+        json={
+            "email": "signup-user@example.com",
+            "password": "Password123",
+            "displayName": "Signup User",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "verification_required",
+        "email": "signup-user@example.com",
+    }
+    assert len(sent_codes) == 1
+    assert sent_codes[0][0] == "signup-user@example.com"
+
+    user = db.query(User).filter(
+        User.pending_contact_email == "signup-user@example.com"
+    ).first()
+    assert user is not None
+    assert user.contact_email is None
+    assert user.contact_email_verified is False
+    assert user.password_hash is not None
+
+
+def test_signup_reuses_pending_email_signup(monkeypatch):
+    db = TestingSessionLocal()
+    sent_codes = []
+
+    monkeypatch.setattr(
+        "app.routers.auth.send_email_verification_code",
+        lambda email, code: sent_codes.append((email, code)),
+    )
+
+    payload = {
+        "email": "pending-signup@example.com",
+        "password": "Password123",
+        "displayName": "Pending Signup",
+    }
+
+    first_response = client.post("/auth/signup", json=payload)
+    second_response = client.post(
+        "/auth/signup",
+        json={
+            **payload,
+            "password": "ChangedPassword123",
+            "displayName": "Pending Signup Updated",
+        },
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+    assert len(sent_codes) == 2
+
+    users = db.query(User).filter(
+        User.pending_contact_email == "pending-signup@example.com"
+    ).all()
+    assert len(users) == 1
+    assert users[0].display_name == "Pending Signup Updated"
+
+
+def test_signup_verify_activates_email_account(monkeypatch):
+    db = TestingSessionLocal()
+    sent_codes = []
+
+    monkeypatch.setattr(
+        "app.routers.auth.send_email_verification_code",
+        lambda email, code: sent_codes.append((email, code)),
+    )
+
+    signup_response = client.post(
+        "/auth/signup",
+        json={
+            "email": "verify-signup@example.com",
+            "password": "Password123",
+            "displayName": "Verify Signup",
+        },
+    )
+    assert signup_response.status_code == 200
+
+    verify_response = client.post(
+        "/auth/signup/verify",
+        json={
+            "email": "verify-signup@example.com",
+            "code": sent_codes[0][1],
+            "deviceId": "android-device",
+            "deviceName": "Pixel",
+            "platform": "android",
+            "appVersion": "1.0.0",
+        },
+    )
+
+    assert verify_response.status_code == 200
+    body = verify_response.json()
+    assert body["user"]["email"] == "verify-signup@example.com"
+    assert body["user"]["contactEmailVerified"] is True
+    assert body["user"]["linkedProviders"] == []
+
+    user = db.query(User).filter(
+        User.contact_email == "verify-signup@example.com"
+    ).first()
+    assert user is not None
+    assert user.pending_contact_email is None
+
+
+def test_signup_verify_rejects_email_claimed_by_another_user(monkeypatch):
+    db = TestingSessionLocal()
+    sent_codes = []
+
+    monkeypatch.setattr(
+        "app.routers.auth.send_email_verification_code",
+        lambda email, code: sent_codes.append((email, code)),
+    )
+
+    signup_response = client.post(
+        "/auth/signup",
+        json={
+            "email": "claimed-signup@example.com",
+            "password": "Password123",
+            "displayName": "Claimed Signup",
+        },
+    )
+    assert signup_response.status_code == 200
+
+    claimed_user = User(
+        apple_sub="claimed-signup-other-sub",
+        email="claimed-signup@example.com",
+        contact_email="claimed-signup@example.com",
+        contact_email_verified=True,
+    )
+    db.add(claimed_user)
+    db.commit()
+
+    verify_response = client.post(
+        "/auth/signup/verify",
+        json={
+            "email": "claimed-signup@example.com",
+            "code": sent_codes[0][1],
+            "deviceId": "android-device",
+            "platform": "android",
+        },
+    )
+
+    assert verify_response.status_code == 400
+    assert verify_response.json()["detail"] == "Email is already in use"
+
+
 def test_password_login_rejects_unverified_contact_email_with_password():
     db = TestingSessionLocal()
     user = _create_user(db, email="password-user@example.com", apple_sub="password-user-sub")
