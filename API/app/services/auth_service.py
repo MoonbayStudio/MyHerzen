@@ -23,6 +23,7 @@ from app.utils.email import EMAIL_VERIFICATION_PATTERN
 
 
 apple_keys_cache = None
+EMAIL_DELIVERY_ERROR_DETAIL = "Failed to send verification email"
 
 
 def get_apple_keys():
@@ -187,6 +188,30 @@ def send_password_reset_code(email: str, code: str) -> None:
         pass
 
 
+def _raise_email_delivery_error(
+    *,
+    action: str,
+    email: str,
+    response: Optional[requests.Response] = None,
+    error: Optional[requests.RequestException] = None,
+) -> None:
+    if response is not None:
+        print(
+            "Email delivery failed: "
+            f"action={action}, email={email}, "
+            f"status={response.status_code}, body={response.text[:500]}",
+            flush=True,
+        )
+    elif error is not None:
+        print(
+            "Email delivery failed: "
+            f"action={action}, email={email}, error={error}",
+            flush=True,
+        )
+
+    raise HTTPException(status_code=502, detail=EMAIL_DELIVERY_ERROR_DETAIL)
+
+
 def send_email_verification_code(email: str, code: str) -> None:
     api_key = normalize_optional_string(RESEND_API_KEY)
 
@@ -212,11 +237,19 @@ def send_email_verification_code(email: str, code: str) -> None:
             json=payload,
             timeout=10,
         )
-    except requests.RequestException:
-        raise HTTPException(status_code=502, detail="Failed to send verification email")
+    except requests.RequestException as error:
+        _raise_email_delivery_error(
+            action="signup_code",
+            email=email,
+            error=error,
+        )
 
     if response.status_code >= 400:
-        raise HTTPException(status_code=502, detail="Failed to send verification email")
+        _raise_email_delivery_error(
+            action="signup_code",
+            email=email,
+            response=response,
+        )
 
 
 def send_contact_email_verification(email: str, token: str) -> None:
@@ -253,11 +286,19 @@ def send_contact_email_verification(email: str, token: str) -> None:
             json=payload,
             timeout=10,
         )
-    except requests.RequestException:
-        raise HTTPException(status_code=502, detail="Failed to send verification email")
+    except requests.RequestException as error:
+        _raise_email_delivery_error(
+            action="contact_email_link",
+            email=email,
+            error=error,
+        )
 
     if response.status_code >= 400:
-        raise HTTPException(status_code=502, detail="Failed to send verification email")
+        _raise_email_delivery_error(
+            action="contact_email_link",
+            email=email,
+            response=response,
+        )
 
 
 def normalize_datetime(value: Optional[datetime]) -> Optional[datetime]:
