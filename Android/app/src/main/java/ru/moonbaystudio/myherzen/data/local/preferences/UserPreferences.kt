@@ -21,6 +21,8 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
     private val SCHEDULE_GROUP_ID_KEY = intPreferencesKey("schedule_group_id")
     private val SCHEDULE_GROUP_NAME_KEY = stringPreferencesKey("schedule_group_name")
     private val THEME_ID_KEY = stringPreferencesKey("selected_theme_id")
+    private val THEME_FAMILY_ID_KEY = stringPreferencesKey("selected_theme_family_id")
+    private val FOLLOW_SYSTEM_THEME_KEY = booleanPreferencesKey("follow_system_theme")
     
     // Accessibility
     private val REDUCE_MOTION_KEY = booleanPreferencesKey("accessibility_reduce_motion")
@@ -46,6 +48,8 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
     val scheduleGroupId: Flow<Int?> = context.dataStore.data.map { it[SCHEDULE_GROUP_ID_KEY] ?: it[GROUP_ID_KEY] }
     val scheduleGroupName: Flow<String?> = context.dataStore.data.map { it[SCHEDULE_GROUP_NAME_KEY] ?: it[GROUP_NAME_KEY] }
     val selectedThemeId: Flow<String> = context.dataStore.data.map { it[THEME_ID_KEY] ?: "classic" }
+    val selectedThemeFamilyId: Flow<String> = context.dataStore.data.map { it[THEME_FAMILY_ID_KEY] ?: "standard" }
+    val followSystemTheme: Flow<Boolean> = context.dataStore.data.map { it[FOLLOW_SYSTEM_THEME_KEY] ?: true }
 
     val reduceMotion: Flow<Boolean> = context.dataStore.data.map { it[REDUCE_MOTION_KEY] ?: false }
     val highContrast: Flow<Boolean> = context.dataStore.data.map { it[HIGH_CONTRAST_KEY] ?: false }
@@ -119,6 +123,14 @@ class UserPreferences @Inject constructor(@ApplicationContext private val contex
 
     suspend fun saveThemeId(themeId: String) {
         context.dataStore.edit { it[THEME_ID_KEY] = themeId }
+    }
+
+    suspend fun saveThemeFamilyId(familyId: String) {
+        context.dataStore.edit { it[THEME_FAMILY_ID_KEY] = familyId }
+    }
+
+    suspend fun updateFollowSystemTheme(enabled: Boolean) {
+        context.dataStore.edit { it[FOLLOW_SYSTEM_THEME_KEY] = enabled }
     }
 
     suspend fun updateReduceMotion(enabled: Boolean) {

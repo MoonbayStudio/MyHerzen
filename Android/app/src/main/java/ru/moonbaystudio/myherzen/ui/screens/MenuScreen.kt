@@ -34,9 +34,6 @@ fun MenuScreen(
                 MenuItem(icon = Icons.Default.List, title = "Институты и группы", onClick = { onNavigate("group_selection") })
             }
             item {
-                MenuItem(icon = Icons.Default.AccountCircle, title = "Участники моей группы", onClick = { onNavigate("group_members") })
-            }
-            item {
                 MenuItem(icon = Icons.Default.Settings, title = "Настройки приложения", onClick = { onNavigate("settings") })
             }
             item {

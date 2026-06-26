@@ -3,7 +3,9 @@ package ru.moonbaystudio.myherzen
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
@@ -48,10 +50,12 @@ import ru.moonbaystudio.myherzen.ui.screens.AssistantScreen
 import ru.moonbaystudio.myherzen.ui.screens.EmailChangeScreen
 import ru.moonbaystudio.myherzen.ui.screens.GroupMembersScreen
 import ru.moonbaystudio.myherzen.ui.screens.GroupSelectionScreen
+import ru.moonbaystudio.myherzen.ui.screens.LaunchScreen
 import ru.moonbaystudio.myherzen.ui.screens.LoginScreen
 import ru.moonbaystudio.myherzen.ui.screens.MenuScreen
 import ru.moonbaystudio.myherzen.ui.screens.OnboardingScreen
 import ru.moonbaystudio.myherzen.ui.screens.PasswordSetupScreen
+import ru.moonbaystudio.myherzen.ui.screens.PremiumScreen
 import ru.moonbaystudio.myherzen.ui.screens.ProfileEditorScreen
 import ru.moonbaystudio.myherzen.ui.screens.ScheduleScreen
 import ru.moonbaystudio.myherzen.ui.screens.SessionScreen
@@ -70,20 +74,35 @@ class MainActivity : ComponentActivity() {
     lateinit var userPreferences: UserPreferences
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
 
         // Обработка Deep Link при запуске
         intent?.data?.let { handleAuthDeepLink(it) }
 
         setContent {
+            var showLaunchScreen by remember { mutableStateOf(true) }
             val selectedThemeId by userPreferences.selectedThemeId.collectAsState(initial = "classic")
+            val followSystemTheme by userPreferences.followSystemTheme.collectAsState(initial = true)
+            val selectedThemeFamilyId by userPreferences.selectedThemeFamilyId.collectAsState(initial = "standard")
+            val isSystemDark = isSystemInDarkTheme()
+
+            val appTheme = remember(selectedThemeId, followSystemTheme, selectedThemeFamilyId, isSystemDark) {
+                if (followSystemTheme) {
+                    val family = AppThemeCatalog.families.find { it.id == selectedThemeFamilyId }
+                        ?: AppThemeCatalog.families[0]
+                    AppThemeCatalog.theme(if (isSystemDark) family.darkThemeID else family.lightThemeID)
+                } else {
+                    AppThemeCatalog.theme(selectedThemeId)
+                }
+            }
+
             val liveActivityEnabled by userPreferences.liveActivityEnabled.collectAsState(initial = true)
             val highContrast by userPreferences.highContrast.collectAsState(initial = false)
             val largerText by userPreferences.largerText.collectAsState(initial = false)
             val selectedGroupId by userPreferences.selectedGroupId.collectAsState(initial = null)
             val scheduleGroupId by userPreferences.scheduleGroupId.collectAsState(initial = null)
             val onboardingCompleted by userPreferences.onboardingCompleted.collectAsState(initial = null)
-            val appTheme = AppThemeCatalog.theme(selectedThemeId)
 
             LaunchedEffect(liveActivityEnabled, selectedGroupId) {
                 val intent = android.content.Intent(this@MainActivity, ScheduleLiveService::class.java)
@@ -104,7 +123,11 @@ class MainActivity : ComponentActivity() {
                 largerText = largerText
             ) {
                 ThemedBackground(theme = appTheme) {
-                    AppNavigation(selectedGroupId, scheduleGroupId ?: selectedGroupId, onboardingCompleted)
+                    if (showLaunchScreen) {
+                        LaunchScreen(onFinished = { showLaunchScreen = false })
+                    } else {
+                        AppNavigation(selectedGroupId, scheduleGroupId ?: selectedGroupId, onboardingCompleted)
+                    }
                 }
             }
         }
@@ -251,7 +274,10 @@ fun AppNavigation(selectedGroupId: Int?, scheduleGroupId: Int?, onboardingComple
                 GroupMembersScreen(onBack = { navController.popBackStack() })
             }
             composable("profile_editor") {
-                ProfileEditorScreen(onBack = { navController.popBackStack() })
+                ProfileEditorScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigate = { route: String -> navController.navigate(route) }
+                )
             }
             composable("admin") {
                 AdminPanelScreen(
@@ -272,6 +298,9 @@ fun AppNavigation(selectedGroupId: Int?, scheduleGroupId: Int?, onboardingComple
             }
             composable("password_setup") {
                 PasswordSetupScreen(onBack = { navController.popBackStack() })
+            }
+            composable("premium") {
+                PremiumScreen(onBack = { navController.popBackStack() })
             }
             composable("login") {
                 LoginScreen(onLoginSuccess = {

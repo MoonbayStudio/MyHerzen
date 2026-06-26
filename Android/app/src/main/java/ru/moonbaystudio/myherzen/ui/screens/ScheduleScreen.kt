@@ -134,13 +134,35 @@ fun ScheduleScreen(
             val pullToRefreshState = rememberPullToRefreshState()
             
             PullToRefreshBox(
-                isRefreshing = isLoading,
+                isRefreshing = isLoading && items.isNotEmpty(),
                 onRefresh = { viewModel.manualRefresh() },
                 state = pullToRefreshState,
                 modifier = Modifier.fillMaxSize()
             ) {
                 if (isLoading && items.isEmpty()) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                } else if (items.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                modifier = Modifier.size(64.dp),
+                                tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            Text(
+                                text = "Сегодня нет пар",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "Можно отдохнуть!",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            )
+                        }
+                    }
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),

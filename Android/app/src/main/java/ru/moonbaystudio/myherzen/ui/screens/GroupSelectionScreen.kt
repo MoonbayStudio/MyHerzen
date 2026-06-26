@@ -139,7 +139,10 @@ fun GroupSelectionScreen(
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 104.dp)
+                ) {
                     if (selectionMessage != null || isSelectingGroup) {
                         item {
                             Text(

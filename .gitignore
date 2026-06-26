@@ -130,3 +130,6 @@ temp/
 # Project-specific
 # =========================
 Web/**/.DS_Store
+
+# Local Codex working notes
+CODEX.local.md

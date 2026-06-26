@@ -37,7 +37,7 @@ fun GroupMembersScreen(
     Scaffold(
         topBar = {
             CapsuleHeader(
-                title = "Участники группы",
+                title = "Моя группа",
                 navigationIcon = {
                     Surface(
                         onClick = onBack,

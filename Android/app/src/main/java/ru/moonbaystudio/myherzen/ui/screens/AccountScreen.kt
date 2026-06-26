@@ -68,12 +68,7 @@ fun AccountScreen(
     Scaffold(
         topBar = {
             CapsuleHeader(
-                title = "Аккаунт",
-                actions = {
-                    if (isLoggedIn) {
-                        ActionCapsule(icon = Icons.Default.Edit, onClick = { onNavigate("profile_editor") })
-                    }
-                }
+                title = "Аккаунт"
             )
         }
     ) { padding ->
@@ -105,7 +100,7 @@ fun AccountScreen(
                                 tint = MaterialTheme.colorScheme.primary
                             )
                             Spacer(Modifier.width(16.dp))
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(text = currentUser?.name ?: "Пользователь", style = MaterialTheme.typography.titleLarge)
                                     if (currentUser?.badges?.isNotEmpty() == true) {
@@ -113,8 +108,7 @@ fun AccountScreen(
                                         UserBadgeRow(badges = currentUser!!.badges)
                                     }
                                 }
-                                Text(text = currentUser?.email ?: "Email не указан", style = MaterialTheme.typography.bodyMedium)
-                                
+
                                 Row(modifier = Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                                     currentUser?.roles?.forEach { role ->
                                         Surface(
@@ -128,7 +122,7 @@ fun AccountScreen(
                                             )
                                         }
                                     }
-                                    
+
                                     if (selectedGroupName != null) {
                                         Surface(
                                             color = MaterialTheme.colorScheme.secondaryContainer,
@@ -142,6 +136,14 @@ fun AccountScreen(
                                         }
                                     }
                                 }
+                            }
+
+                            IconButton(onClick = { onNavigate("profile_editor") }) {
+                                Icon(
+                                    Icons.Default.Edit,
+                                    contentDescription = "Редактировать профиль",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
                             }
                         }
                     }
@@ -170,48 +172,9 @@ fun AccountScreen(
                         Spacer(modifier = Modifier.height(16.dp))
                     }
 
-                    if (currentUser?.badges?.isNotEmpty() == true) {
-                        Text("Значки", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 8.dp))
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-                        ) {
-                            FlowRow(
-                                modifier = Modifier.padding(12.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                currentUser!!.badges.forEach { badge ->
-                                    var showDetail by remember { mutableStateOf(false) }
-                                    BadgeIcon(badge, size = 32) {
-                                        showDetail = true
-                                    }
-                                    if (showDetail) {
-                                        BadgeDetailDialog(badge = badge, onDismiss = { showDetail = false })
-                                    }
-                                }
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-
-                    val canRequestTester = currentUser?.isAdmin != true && currentUser?.isTester != true
-                    if (canRequestTester || roleRequests.isNotEmpty() || groupChangeRequests.isNotEmpty()) {
-                        MyRequestsCard(
-                            requests = roleRequests,
-                            groupChangeRequests = groupChangeRequests,
-                            isLoading = isLoading,
-                            canRequestTester = canRequestTester,
-                            onRequestTester = { viewModel.requestTesterRole() },
-                            onCancelRoleRequest = { viewModel.cancelRoleRequest(it) },
-                            onCancelGroupChangeRequest = { viewModel.cancelGroupChangeRequest(it) }
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                    
                     AccountOption(icon = Icons.Default.Lock, title = "Безопасность", onClick = { onNavigate("security") })
-                    AccountOption(icon = Icons.Default.Person, title = "Моя группа", onClick = { onNavigate("group_members") })
-                    AccountOption(icon = Icons.Default.Edit, title = "Сменить группу по умолчанию", onClick = { onNavigate("default_group_selection") })
+                    AccountOption(icon = Icons.Default.Group, title = "Моя группа", onClick = { onNavigate("group_members") })
+                    AccountOption(icon = Icons.Default.Star, title = "Мой Герцена Плюс/Премиум", onClick = { onNavigate("premium") })
 
                     if (currentUser?.isAdmin == true || currentUser?.isModerator == true) {
                         AccountOption(icon = Icons.Default.Settings, title = "Админка", onClick = { onNavigate("admin") })

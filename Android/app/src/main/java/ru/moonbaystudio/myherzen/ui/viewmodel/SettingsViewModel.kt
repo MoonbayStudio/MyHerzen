@@ -19,6 +19,8 @@ class SettingsViewModel @Inject constructor(
     val defaultPersona = userPreferences.defaultPersona.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "pelikasha")
     val selectedGroupName = userPreferences.selectedGroupName.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
     val selectedThemeId = userPreferences.selectedThemeId.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "classic")
+    val selectedThemeFamilyId = userPreferences.selectedThemeFamilyId.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "standard")
+    val followSystemTheme = userPreferences.followSystemTheme.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val scheduleCacheWeeks = userPreferences.scheduleCacheWeeks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 2)
     val liveActivityEnabled = userPreferences.liveActivityEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
     val offlineScheduleEnabled = userPreferences.offlineScheduleEnabled.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
@@ -59,6 +61,14 @@ class SettingsViewModel @Inject constructor(
 
     fun updateTheme(themeId: String) = viewModelScope.launch {
         userPreferences.saveThemeId(themeId)
+    }
+
+    fun updateThemeFamily(familyId: String) = viewModelScope.launch {
+        userPreferences.saveThemeFamilyId(familyId)
+    }
+
+    fun updateFollowSystemTheme(enabled: Boolean) = viewModelScope.launch {
+        userPreferences.updateFollowSystemTheme(enabled)
     }
 
     fun updateScheduleCacheWeeks(weeks: Int) = viewModelScope.launch {

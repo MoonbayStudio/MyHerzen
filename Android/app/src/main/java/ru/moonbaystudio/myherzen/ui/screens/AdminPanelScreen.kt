@@ -185,7 +185,7 @@ fun AdminPanelScreen(
                         users.filter { it.name?.contains(searchText, true) == true || it.email?.contains(searchText, true) == true }
                     }
 
-                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 100.dp)) {
+                    LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 112.dp)) {
                         when (selectedTab) {
                             AdminTab.USERS -> {
                                 items(items = filteredUsers) { user ->
