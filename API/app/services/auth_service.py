@@ -20,6 +20,7 @@ from app.core.config import (
     FRONTEND_BASE_URL,
     SMTP_FROM_EMAIL,
     SMTP_FROM_NAME,
+    SMTP_FALLBACK_PORTS,
     SMTP_HOST,
     SMTP_PASSWORD,
     SMTP_PORT,
@@ -339,23 +340,43 @@ async def _send_template_email(
     )
     _attach_inline_logo(message, logo_path)
 
-    try:
-        await aiosmtplib.send(
-            message,
-            hostname=SMTP_HOST,
-            port=SMTP_PORT,
-            username=SMTP_USERNAME,
-            password=password,
-            use_tls=SMTP_USE_TLS,
-            timeout=SMTP_TIMEOUT_SECONDS,
-        )
-    except Exception as error:
-        if raise_on_failure:
-            _raise_email_delivery_error(action=action, email=email, error=error)
-        print(
-            f"Email delivery failed without blocking: action={action}, email={email}, error={error}",
-            flush=True,
-        )
+    last_error: Optional[Exception] = None
+    attempted_ports = []
+    for port in [SMTP_PORT, *SMTP_FALLBACK_PORTS]:
+        if port in attempted_ports:
+            continue
+        attempted_ports.append(port)
+
+        use_tls = SMTP_USE_TLS if port == SMTP_PORT else port == 465
+        start_tls = None if use_tls else port in {25, 587}
+
+        try:
+            await aiosmtplib.send(
+                message,
+                hostname=SMTP_HOST,
+                port=port,
+                username=SMTP_USERNAME,
+                password=password,
+                use_tls=use_tls,
+                start_tls=start_tls,
+                timeout=SMTP_TIMEOUT_SECONDS,
+            )
+            return
+        except Exception as error:
+            last_error = error
+            print(
+                "Email delivery attempt failed: "
+                f"action={action}, email={email}, host={SMTP_HOST}, port={port}, "
+                f"use_tls={use_tls}, start_tls={start_tls}, error={error}",
+                flush=True,
+            )
+
+    if raise_on_failure:
+        _raise_email_delivery_error(action=action, email=email, error=last_error)
+    print(
+        f"Email delivery failed without blocking: action={action}, email={email}, error={last_error}",
+        flush=True,
+    )
 
 
 def _code_html(code: str) -> str:

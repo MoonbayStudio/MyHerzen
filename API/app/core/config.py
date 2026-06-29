@@ -92,7 +92,12 @@ SMTP_FROM_EMAIL = os.getenv(
 )
 SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "Мой Герцена")
 SMTP_USE_TLS = _parse_bool_env("SMTP_USE_TLS", True)
-SMTP_TIMEOUT_SECONDS = _parse_int_env("SMTP_TIMEOUT_SECONDS", 15)
+SMTP_TIMEOUT_SECONDS = _parse_int_env("SMTP_TIMEOUT_SECONDS", 60)
+SMTP_FALLBACK_PORTS = [
+    int(port.strip())
+    for port in os.getenv("SMTP_FALLBACK_PORTS", "587").split(",")
+    if port.strip().isdigit()
+]
 EMAIL_LOGO_PATH = os.getenv("EMAIL_LOGO_PATH", "logomh.png")
 
 GOOGLE_CLIENT_IDS = [
