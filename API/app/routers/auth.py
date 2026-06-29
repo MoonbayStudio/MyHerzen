@@ -1,4 +1,5 @@
 import hashlib
+import inspect
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Form
@@ -47,13 +48,18 @@ from app.services.auth_service import (
     get_apple_keys,
     hash_contact_email_token,
     normalize_datetime,
+    send_new_device_login_notification,
     send_contact_email_verification,
     send_email_verification_code,
     send_password_reset_code,
     validate_contact_email,
 )
 from app.services.user_profile_service import build_user_response, normalize_email, user_has_password
-from app.services.user_sessions_service import SessionTrackingInput, track_login_session
+from app.services.user_sessions_service import (
+    SessionTrackingInput,
+    should_notify_new_login_device,
+    track_login_session,
+)
 from app.utils.common import normalize_optional_string
 from app.utils.google_auth import verify_google_token
 
@@ -77,6 +83,62 @@ def _mask_login_email(email: str) -> str:
     else:
         masked_local_part = f"{local_part[:2]}***"
     return f"{masked_local_part}@{domain}"
+
+
+async def _maybe_await_delivery(result) -> None:
+    if inspect.isawaitable(result):
+        await result
+
+
+async def _track_login_session_and_notify(
+    *,
+    request: Request,
+    db: Session,
+    user: User,
+    session_token: str,
+    device_id: str | None,
+    device_name: str | None,
+    platform: str | None,
+    app_version: str | None,
+) -> None:
+    payload = SessionTrackingInput(
+        session_token=session_token,
+        device_id=device_id,
+        device_name=device_name,
+        platform=platform,
+        app_version=app_version,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    should_notify = should_notify_new_login_device(
+        db=db,
+        user_id=user.id,
+        payload=payload,
+    )
+    session = track_login_session(
+        db=db,
+        user_id=user.id,
+        payload=payload,
+    )
+
+    if not should_notify:
+        return
+
+    notification_email = normalize_email(user.contact_email) or normalize_email(user.email)
+    if notification_email is None or not user.contact_email_verified:
+        return
+
+    await _maybe_await_delivery(
+        send_new_device_login_notification(
+            email=notification_email,
+            occurred_at=session.last_seen_at,
+            ip_address=session.ip_address,
+            device_name=session.device_name,
+            platform=session.platform,
+            app_version=session.app_version,
+            user_agent=session.user_agent,
+        )
+    )
 
 
 @limiter.limit("10/minute")
@@ -145,18 +207,15 @@ async def google_login(
     db.refresh(user)
 
     session_token = create_session_token(user.id)
-    track_login_session(
+    await _track_login_session_and_notify(
+        request=request,
         db=db,
-        user_id=user.id,
-        payload=SessionTrackingInput(
-            session_token=session_token,
-            device_id=data.deviceId,
-            device_name=data.deviceName,
-            platform=data.platform,
-            app_version=data.appVersion,
-            ip_address=request.client.host if request.client else None,
-            user_agent=request.headers.get("user-agent"),
-        ),
+        user=user,
+        session_token=session_token,
+        device_id=data.deviceId,
+        device_name=data.deviceName,
+        platform=data.platform,
+        app_version=data.appVersion,
     )
 
     return {
@@ -235,7 +294,9 @@ async def email_change_request(
     )
 
     db.commit()
-    send_email_verification_code(email=normalized_email, code=code)
+    await _maybe_await_delivery(
+        send_email_verification_code(email=normalized_email, code=code)
+    )
 
     return {"status": "verification_required"}
 
@@ -306,7 +367,9 @@ async def request_contact_email(
     )
 
     db.commit()
-    send_contact_email_verification(email=normalized_email, token=token)
+    await _maybe_await_delivery(
+        send_contact_email_verification(email=normalized_email, token=token)
+    )
 
     return {"success": True}
 
@@ -390,7 +453,9 @@ async def resend_contact_email_verification(
     )
 
     db.commit()
-    send_contact_email_verification(email=target_email, token=token)
+    await _maybe_await_delivery(
+        send_contact_email_verification(email=target_email, token=token)
+    )
 
     return {"success": True}
 
@@ -479,7 +544,9 @@ async def signup(
     )
 
     db.commit()
-    send_email_verification_code(email=normalized_email, code=code)
+    await _maybe_await_delivery(
+        send_email_verification_code(email=normalized_email, code=code)
+    )
 
     return {"status": "verification_required", "email": normalized_email}
 
@@ -523,18 +590,15 @@ async def signup_verify(
     db.refresh(user)
 
     session_token = create_session_token(user.id)
-    track_login_session(
+    await _track_login_session_and_notify(
+        request=request,
         db=db,
-        user_id=user.id,
-        payload=SessionTrackingInput(
-            session_token=session_token,
-            device_id=data.deviceId,
-            device_name=data.deviceName,
-            platform=data.platform,
-            app_version=data.appVersion,
-            ip_address=request.client.host if request.client else None,
-            user_agent=request.headers.get("user-agent"),
-        ),
+        user=user,
+        session_token=session_token,
+        device_id=data.deviceId,
+        device_name=data.deviceName,
+        platform=data.platform,
+        app_version=data.appVersion,
     )
 
     return {
@@ -579,18 +643,15 @@ async def password_login(
     print(f"Password login accepted: user_id={user.id}")
 
     session_token = create_session_token(user.id)
-    track_login_session(
+    await _track_login_session_and_notify(
+        request=request,
         db=db,
-        user_id=user.id,
-        payload=SessionTrackingInput(
-            session_token=session_token,
-            device_id=data.deviceId,
-            device_name=data.deviceName,
-            platform=data.platform,
-            app_version=data.appVersion,
-            ip_address=request.client.host if request.client else None,
-            user_agent=request.headers.get("user-agent"),
-        ),
+        user=user,
+        session_token=session_token,
+        device_id=data.deviceId,
+        device_name=data.deviceName,
+        platform=data.platform,
+        app_version=data.appVersion,
     )
 
     return {
@@ -645,7 +706,9 @@ async def password_reset_request(
         if user is not None:
             code = create_password_reset_code(user)
             db.commit()
-            send_password_reset_code(normalized_email, code)
+            await _maybe_await_delivery(
+                send_password_reset_code(normalized_email, code)
+            )
 
     return {"status": "ok"}
 
@@ -799,18 +862,15 @@ async def apple_login(
         db.refresh(user)
 
         session_token = create_session_token(user.id)
-        track_login_session(
+        await _track_login_session_and_notify(
+            request=request,
             db=db,
-            user_id=user.id,
-            payload=SessionTrackingInput(
-                session_token=session_token,
-                device_id=data.deviceId,
-                device_name=data.deviceName,
-                platform=data.platform,
-                app_version=data.appVersion,
-                ip_address=request.client.host if request.client else None,
-                user_agent=request.headers.get("user-agent"),
-            ),
+            user=user,
+            session_token=session_token,
+            device_id=data.deviceId,
+            device_name=data.deviceName,
+            platform=data.platform,
+            app_version=data.appVersion,
         )
 
         return {

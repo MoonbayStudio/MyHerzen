@@ -2,6 +2,7 @@ slowapi
 fastapi
 uvicorn[standard]
 requests
+aiosmtplib
 google-auth
 python-multipart
 python-jose

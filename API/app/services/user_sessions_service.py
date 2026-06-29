@@ -36,6 +36,40 @@ def _normalize_optional_text(value: Optional[str], max_len: int) -> Optional[str
     return normalized
 
 
+def should_notify_new_login_device(
+    db: Session,
+    user_id: int,
+    payload: SessionTrackingInput,
+) -> bool:
+    active_sessions = [
+        session
+        for session in user_sessions_repository.list_user_sessions(db=db, user_id=user_id)
+        if session.revoked_at is None
+    ]
+    if not active_sessions:
+        return False
+
+    device_id = _normalize_optional_text(payload.device_id, 255)
+    if device_id is not None:
+        return all(session.device_id != device_id for session in active_sessions)
+
+    device_name = _normalize_optional_text(payload.device_name, 255)
+    platform = normalize_platform(payload.platform)
+    user_agent = _normalize_optional_text(payload.user_agent, 1024)
+    if not any([device_name, platform, user_agent]):
+        return False
+
+    for session in active_sessions:
+        if (
+            session.device_name == device_name
+            and session.platform == platform
+            and session.user_agent == user_agent
+        ):
+            return False
+
+    return True
+
+
 def track_login_session(
     db: Session,
     user_id: int,

@@ -426,6 +426,38 @@ def test_password_login_tracks_android_session_platform():
     assert sessions[0]["isCurrent"] is True
 
 
+def test_password_login_sends_new_device_notification(monkeypatch):
+    db = TestingSessionLocal()
+    user = _create_user(db, email="security-user@example.com", apple_sub="security-user-sub")
+    user.password_hash = hash_password("Password123")
+    db.commit()
+    _create_tracked_session(db, user.id)
+    sent_notifications = []
+
+    monkeypatch.setattr(
+        "app.routers.auth.send_new_device_login_notification",
+        lambda **kwargs: sent_notifications.append(kwargs),
+    )
+
+    response = client.post(
+        "/auth/login",
+        json={
+            "email": "security-user@example.com",
+            "password": "Password123",
+            "deviceId": "new-device",
+            "deviceName": "Pixel",
+            "platform": "android",
+            "appVersion": "1.0.0",
+        },
+    )
+
+    assert response.status_code == 200
+    assert len(sent_notifications) == 1
+    assert sent_notifications[0]["email"] == "security-user@example.com"
+    assert sent_notifications[0]["device_name"] == "Pixel"
+    assert sent_notifications[0]["platform"] == "android"
+
+
 def test_provider_email_contact_verification_rules():
     apple_user = User(apple_sub="apple-contact-rules-sub")
     apply_apple_email_to_user(

@@ -14,6 +14,17 @@ def _parse_bool_env(var_name: str, default: bool) -> bool:
 
     return default
 
+
+def _parse_int_env(var_name: str, default: int) -> int:
+    raw_value = os.getenv(var_name)
+    if raw_value is None:
+        return default
+
+    try:
+        return int(raw_value.strip())
+    except (TypeError, ValueError):
+        return default
+
 APPLE_KEYS_URL = "https://appleid.apple.com/auth/keys"
 APPLE_AUDIENCES = [
     "MoonbayStudio.MyHerzen",
@@ -68,15 +79,21 @@ INVALID_PASSWORD_LOGIN_DETAIL = "Invalid email or password"
 APPLE_RELAY_EMAIL_DOMAIN = "privaterelay.appleid.com"
 EMAIL_VERIFICATION_EXPIRES_HOURS = 24
 
-RESEND_API_KEY = os.getenv("RESEND_API_KEY")
-RESEND_API_URL = os.getenv(
-    "RESEND_API_URL",
-    "https://api.resend.com/emails"
+SMTP_HOST = os.getenv("SMTP_HOST", "mail.hosting.reg.ru")
+SMTP_PORT = _parse_int_env("SMTP_PORT", 465)
+SMTP_USERNAME = os.getenv(
+    "SMTP_USERNAME",
+    "security@myherzen.moonbaystudio.ru",
 )
-RESEND_FROM_EMAIL = os.getenv(
-    "RESEND_FROM_EMAIL",
-    "MyHerzen <noreply@myherzen.moonbaystudio.ru>"
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD")
+SMTP_FROM_EMAIL = os.getenv(
+    "SMTP_FROM_EMAIL",
+    "security@myherzen.moonbaystudio.ru",
 )
+SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "Мой Герцена")
+SMTP_USE_TLS = _parse_bool_env("SMTP_USE_TLS", True)
+SMTP_TIMEOUT_SECONDS = _parse_int_env("SMTP_TIMEOUT_SECONDS", 15)
+EMAIL_LOGO_PATH = os.getenv("EMAIL_LOGO_PATH", "logomh.png")
 
 GOOGLE_CLIENT_IDS = [
     cid.strip()

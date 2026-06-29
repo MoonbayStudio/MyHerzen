@@ -1,6 +1,11 @@
 import hashlib
+import mimetypes
 import secrets
 from datetime import datetime, timedelta, timezone
+from email.message import EmailMessage
+from email.utils import formataddr
+from html import escape
+from pathlib import Path
 from typing import Any, Optional
 
 import requests
@@ -10,11 +15,17 @@ from sqlalchemy.orm import Session
 
 from app.core.config import (
     APPLE_KEYS_URL,
+    EMAIL_LOGO_PATH,
     EMAIL_VERIFICATION_EXPIRES_HOURS,
     FRONTEND_BASE_URL,
-    RESEND_API_KEY,
-    RESEND_API_URL,
-    RESEND_FROM_EMAIL,
+    SMTP_FROM_EMAIL,
+    SMTP_FROM_NAME,
+    SMTP_HOST,
+    SMTP_PASSWORD,
+    SMTP_PORT,
+    SMTP_TIMEOUT_SECONDS,
+    SMTP_USERNAME,
+    SMTP_USE_TLS,
 )
 from app.db.models import User
 from app.services.user_profile_service import is_apple_relay_email, normalize_email
@@ -159,50 +170,13 @@ def create_password_reset_code(user: User) -> str:
     return code
 
 
-def send_password_reset_code(email: str, code: str) -> None:
-    api_key = normalize_optional_string(RESEND_API_KEY)
-
-    if api_key is None:
-        print(f"DEV MODE: Password reset code for {email} is {code}", flush=True)
-        return
-
-    payload = {
-        "from": RESEND_FROM_EMAIL,
-        "to": [email],
-        "subject": "Сброс пароля MyHerzen",
-        "text": f"Код для сброса пароля: {code}\nКод действует 15 минут.",
-        "html": f"<p>Код для сброса пароля: <strong>{code}</strong></p><p>Код действует 15 минут.</p>",
-    }
-
-    try:
-        requests.post(
-            RESEND_API_URL,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            timeout=30,
-        )
-    except requests.RequestException:
-        pass
-
-
 def _raise_email_delivery_error(
     *,
     action: str,
     email: str,
-    response: Optional[requests.Response] = None,
-    error: Optional[requests.RequestException] = None,
+    error: Optional[Exception] = None,
 ) -> None:
-    if response is not None:
-        print(
-            "Email delivery failed: "
-            f"action={action}, email={email}, "
-            f"status={response.status_code}, body={response.text[:500]}",
-            flush=True,
-        )
-    elif error is not None:
+    if error is not None:
         print(
             "Email delivery failed: "
             f"action={action}, email={email}, error={error}",
@@ -212,93 +186,335 @@ def _raise_email_delivery_error(
     raise HTTPException(status_code=502, detail=EMAIL_DELIVERY_ERROR_DETAIL)
 
 
-def send_email_verification_code(email: str, code: str) -> None:
-    api_key = normalize_optional_string(RESEND_API_KEY)
+def _find_email_logo_path() -> Optional[Path]:
+    configured_path = Path(EMAIL_LOGO_PATH).expanduser()
+    candidates = [
+        configured_path,
+        Path.cwd() / configured_path,
+        Path(__file__).resolve().parents[2] / configured_path,
+        Path(__file__).resolve().parents[3] / configured_path,
+        Path(__file__).resolve().parents[3]
+        / "Web"
+        / "myherzen.moonbaystudio.ru"
+        / "img"
+        / "logo.png",
+    ]
 
-    if api_key is None:
-        print(f"DEV MODE: Verification code for {email} is {code}", flush=True)
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file():
+            return candidate
+
+    return None
+
+
+def _build_email_layout(
+    *,
+    title: str,
+    body_html: str,
+    include_logo: bool,
+) -> str:
+    support_url = f"{FRONTEND_BASE_URL}/support/"
+    logo_html = (
+        '<img src="cid:myherzen-logo" width="40" height="40" alt="Мой Герцена" '
+        'style="display:block;border:0;border-radius:10px;">'
+        if include_logo
+        else (
+            '<div style="width:40px;height:40px;border-radius:10px;'
+            'background:#3358ff;"></div>'
+        )
+    )
+
+    return f"""<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{escape(title)}</title>
+  </head>
+  <body style="margin:0;padding:0;background:#ffffff;color:#34446c;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background:#ffffff;">
+      <tr>
+        <td align="center" style="padding:24px 16px 10px;">
+          <table role="presentation" width="580" cellspacing="0" cellpadding="0" style="width:580px;max-width:100%;border-collapse:collapse;">
+            <tr>
+              <td style="padding:0 24px 28px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+                  <tr>
+                    <td style="vertical-align:middle;padding-right:10px;">{logo_html}</td>
+                    <td style="vertical-align:middle;font-family:Arial,Helvetica,sans-serif;font-size:28px;line-height:34px;font-weight:700;color:#151a2f;">
+                      Мой Герцена
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="border:12px solid #dfe6ef;background:#ffffff;padding:36px 34px;font-family:Arial,Helvetica,sans-serif;font-size:17px;line-height:1.58;color:#34446c;">
+                {body_html}
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:6px 18px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#728096;">
+                Если у вас есть вопросы, вы можете обратиться в наш раздел
+                <a href="{escape(support_url)}" style="color:#0969ff;text-decoration:underline;">«Помощь»</a><br>
+                Спасибо за то, что вы с нами! Искренне ваш, Мой Герцена.
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:28px 18px 0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;color:#728096;">
+                Это письмо содержит важную информацию.<br>
+                Оно обязательное и не требует подписки.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>"""
+
+
+def _attach_inline_logo(message: EmailMessage, logo_path: Optional[Path]) -> None:
+    if logo_path is None:
         return
 
-    payload = {
-        "from": RESEND_FROM_EMAIL,
-        "to": [email],
-        "subject": "Код подтверждения MyHerzen",
-        "text": f"Ваш код подтверждения: {code}\nКод действует 15 минут.",
-        "html": f"<p>Ваш код подтверждения: <strong>{code}</strong></p><p>Код действует 15 минут.</p>",
-    }
+    content_type = mimetypes.guess_type(str(logo_path))[0] or "image/png"
+    maintype, _, subtype = content_type.partition("/")
+    if maintype != "image" or not subtype:
+        maintype, subtype = "image", "png"
+
+    html_part = message.get_payload()[-1]
+    html_part.add_related(
+        logo_path.read_bytes(),
+        maintype=maintype,
+        subtype=subtype,
+        cid="<myherzen-logo>",
+        filename=logo_path.name,
+    )
+
+
+async def _send_template_email(
+    *,
+    action: str,
+    email: str,
+    subject: str,
+    text: str,
+    body_html: str,
+    require_configured: bool = False,
+    raise_on_failure: bool = True,
+) -> None:
+    password = normalize_optional_string(SMTP_PASSWORD)
+
+    if password is None:
+        if require_configured:
+            raise HTTPException(status_code=500, detail="Email service is not configured")
+        print(f"DEV MODE: Email action={action}, to={email}, subject={subject}", flush=True)
+        print(text, flush=True)
+        return
 
     try:
-        response = requests.post(
-            RESEND_API_URL,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            timeout=10,
+        import aiosmtplib
+    except ImportError as error:
+        if raise_on_failure:
+            _raise_email_delivery_error(action=action, email=email, error=error)
+        print(
+            f"Email delivery skipped: action={action}, email={email}, error={error}",
+            flush=True,
         )
-    except requests.RequestException as error:
-        _raise_email_delivery_error(
-            action="signup_code",
-            email=email,
-            error=error,
+        return
+
+    logo_path = _find_email_logo_path()
+    message = EmailMessage()
+    message["From"] = formataddr((SMTP_FROM_NAME, SMTP_FROM_EMAIL))
+    message["To"] = email
+    message["Subject"] = subject
+    message.set_content(text)
+    message.add_alternative(
+        _build_email_layout(
+            title=subject,
+            body_html=body_html,
+            include_logo=logo_path is not None,
+        ),
+        subtype="html",
+    )
+    _attach_inline_logo(message, logo_path)
+
+    try:
+        await aiosmtplib.send(
+            message,
+            hostname=SMTP_HOST,
+            port=SMTP_PORT,
+            username=SMTP_USERNAME,
+            password=password,
+            use_tls=SMTP_USE_TLS,
+            timeout=SMTP_TIMEOUT_SECONDS,
+        )
+    except Exception as error:
+        if raise_on_failure:
+            _raise_email_delivery_error(action=action, email=email, error=error)
+        print(
+            f"Email delivery failed without blocking: action={action}, email={email}, error={error}",
+            flush=True,
         )
 
-    if response.status_code >= 400:
-        _raise_email_delivery_error(
-            action="signup_code",
-            email=email,
-            response=response,
-        )
+
+def _code_html(code: str) -> str:
+    return (
+        '<div style="margin:20px 0 22px;padding:18px 20px;border:1px solid #dfe6ef;'
+        'background:#f7f9fc;text-align:center;">'
+        f'<span style="font-family:Arial,Helvetica,sans-serif;font-size:34px;'
+        f'letter-spacing:7px;font-weight:700;color:#17213d;">{escape(code)}</span>'
+        "</div>"
+    )
 
 
-def send_contact_email_verification(email: str, token: str) -> None:
-    api_key = normalize_optional_string(RESEND_API_KEY)
+async def send_password_reset_code(email: str, code: str) -> None:
+    body_html = (
+        "<p style=\"margin:0 0 16px;\"><strong>Вы запросили сброс пароля в Мой Герцена.</strong></p>"
+        "<p style=\"margin:0 0 12px;\">Введите этот код в приложении:</p>"
+        f"{_code_html(code)}"
+        "<p style=\"margin:0;\">Код действует 15 минут. "
+        "Если вы не запрашивали сброс пароля, просто проигнорируйте письмо.</p>"
+    )
+    text = (
+        "Вы запросили сброс пароля в Мой Герцена.\n"
+        f"Код для сброса пароля: {code}\n"
+        "Код действует 15 минут."
+    )
+    await _send_template_email(
+        action="password_reset_code",
+        email=email,
+        subject="Сброс пароля в Мой Герцена",
+        text=text,
+        body_html=body_html,
+    )
 
-    if api_key is None:
-        raise HTTPException(status_code=500, detail="Email service is not configured")
 
+async def send_email_verification_code(email: str, code: str) -> None:
+    body_html = (
+        "<p style=\"margin:0 0 16px;\"><strong>Подтвердите email для аккаунта Мой Герцена.</strong></p>"
+        "<p style=\"margin:0 0 12px;\">Введите этот код в приложении:</p>"
+        f"{_code_html(code)}"
+        "<p style=\"margin:0;\">Код действует 15 минут. Никому не передавайте его.</p>"
+    )
+    text = (
+        "Подтвердите email для аккаунта Мой Герцена.\n"
+        f"Ваш код подтверждения: {code}\n"
+        "Код действует 15 минут. Никому не передавайте его."
+    )
+    await _send_template_email(
+        action="signup_code",
+        email=email,
+        subject="Код подтверждения Мой Герцена",
+        text=text,
+        body_html=body_html,
+    )
+
+
+async def send_contact_email_verification(email: str, token: str) -> None:
     verification_link = f"{FRONTEND_BASE_URL}/verify-email?token={token}"
+    safe_link = escape(verification_link)
+    body_html = (
+        "<p style=\"margin:0 0 16px;\"><strong>Подтвердите контактную почту Мой Герцена.</strong></p>"
+        "<p style=\"margin:0 0 16px;\">Откройте эту ссылку, чтобы завершить подтверждение email:</p>"
+        f'<p style="margin:0 0 16px;word-break:break-all;"><a href="{safe_link}" '
+        f'style="color:#0969ff;text-decoration:underline;">{safe_link}</a></p>'
+        "<p style=\"margin:0;\">Ссылка действует 24 часа.</p>"
+    )
+    text = (
+        "Подтвердите контактную почту Мой Герцена:\n"
+        f"{verification_link}\n\n"
+        "Ссылка действует 24 часа."
+    )
+    await _send_template_email(
+        action="contact_email_link",
+        email=email,
+        subject="Подтвердите email в Мой Герцена",
+        text=text,
+        body_html=body_html,
+        require_configured=True,
+    )
 
-    payload = {
-        "from": RESEND_FROM_EMAIL,
-        "to": [email],
-        "subject": "Подтвердите email в MyHerzen",
-        "text": (
-            "Подтвердите контактную почту MyHerzen: "
-            f"{verification_link}\n\n"
-            "Ссылка действует 24 часа."
-        ),
-        "html": (
-            "<p>Подтвердите контактную почту MyHerzen.</p>"
-            f'<p><a href="{verification_link}">Подтвердить email</a></p>'
-            "<p>Ссылка действует 24 часа.</p>"
-        ),
-    }
 
+def _format_security_datetime(value: Optional[datetime]) -> str:
+    normalized = normalize_datetime(value) or datetime.now(timezone.utc)
     try:
-        response = requests.post(
-            RESEND_API_URL,
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-            timeout=10,
-        )
-    except requests.RequestException as error:
-        _raise_email_delivery_error(
-            action="contact_email_link",
-            email=email,
-            error=error,
-        )
+        from zoneinfo import ZoneInfo
 
-    if response.status_code >= 400:
-        _raise_email_delivery_error(
-            action="contact_email_link",
-            email=email,
-            response=response,
-        )
+        normalized = normalized.astimezone(ZoneInfo("Europe/Moscow"))
+    except Exception:
+        normalized = normalized.astimezone(timezone.utc)
+
+    return normalized.strftime("%Y-%m-%d %H:%M:%S")
+
+
+async def send_new_device_login_notification(
+    *,
+    email: str,
+    occurred_at: datetime,
+    ip_address: Optional[str] = None,
+    device_name: Optional[str] = None,
+    platform: Optional[str] = None,
+    app_version: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> None:
+    timestamp = _format_security_datetime(occurred_at)
+    ip_label = ip_address or "неизвестного IP"
+    device_parts = [
+        part
+        for part in [
+            normalize_optional_string(device_name),
+            normalize_optional_string(platform),
+            f"версия {app_version}" if normalize_optional_string(app_version) else None,
+        ]
+        if part
+    ]
+    device_label = ", ".join(device_parts)
+    user_agent_label = normalize_optional_string(user_agent)
+
+    device_html = (
+        f'<p style="margin:0 0 16px;">Устройство: <strong>{escape(device_label)}</strong>.</p>'
+        if device_label
+        else ""
+    )
+    user_agent_html = (
+        f'<p style="margin:0 0 16px;">User-Agent: '
+        f'<span style="word-break:break-all;">{escape(user_agent_label)}</span></p>'
+        if user_agent_label and not device_label
+        else ""
+    )
+    body_html = (
+        f'<p style="margin:0 0 16px;"><strong>{escape(timestamp)} зафиксирован вход '
+        f'в ваш аккаунт с использованием IP {escape(ip_label)}.</strong></p>'
+        f"{device_html}"
+        f"{user_agent_html}"
+        "<p style=\"margin:0 0 16px;\">Вы получили данное уведомление, потому что "
+        "вход выполнен с устройства, которое ранее не использовалось для этого аккаунта.</p>"
+        "<p style=\"margin:0;\">Если вы не входили в аккаунт, пожалуйста, немедленно "
+        "свяжитесь с технической поддержкой Мой Герцена.</p>"
+    )
+    text_lines = [
+        f"{timestamp} зафиксирован вход в ваш аккаунт с использованием IP {ip_label}.",
+    ]
+    if device_label:
+        text_lines.append(f"Устройство: {device_label}.")
+    elif user_agent_label:
+        text_lines.append(f"User-Agent: {user_agent_label}")
+    text_lines.extend(
+        [
+            "Вы получили данное уведомление, потому что вход выполнен с нового устройства.",
+            "Если это были не вы, свяжитесь с технической поддержкой Мой Герцена.",
+        ]
+    )
+
+    await _send_template_email(
+        action="new_device_login",
+        email=email,
+        subject="Новый вход в аккаунт Мой Герцена",
+        text="\n".join(text_lines),
+        body_html=body_html,
+        raise_on_failure=False,
+    )
 
 
 def normalize_datetime(value: Optional[datetime]) -> Optional[datetime]:
