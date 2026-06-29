@@ -49,6 +49,7 @@ from app.services.auth_service import (
     hash_contact_email_token,
     normalize_datetime,
     send_new_device_login_notification,
+    send_password_security_notification,
     send_contact_email_verification,
     send_email_verification_code,
     send_password_reset_code,
@@ -90,6 +91,13 @@ async def _maybe_await_delivery(result) -> None:
         await result
 
 
+def _verified_notification_email(user: User) -> str | None:
+    notification_email = normalize_email(user.contact_email) or normalize_email(user.email)
+    if notification_email is None or not user.contact_email_verified:
+        return None
+    return notification_email
+
+
 async def _track_login_session_and_notify(
     *,
     request: Request,
@@ -124,8 +132,8 @@ async def _track_login_session_and_notify(
     if not should_notify:
         return
 
-    notification_email = normalize_email(user.contact_email) or normalize_email(user.email)
-    if notification_email is None or not user.contact_email_verified:
+    notification_email = _verified_notification_email(user)
+    if notification_email is None:
         return
 
     await _maybe_await_delivery(
@@ -496,6 +504,16 @@ async def password_create(
 
     db.commit()
 
+    await _maybe_await_delivery(
+        send_password_security_notification(
+            email=normalized_email,
+            action="created",
+            occurred_at=now,
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        )
+    )
+
     return {"status": "password_created"}
 
 
@@ -684,6 +702,18 @@ async def password_change(
     current_user.updated_at = now
 
     db.commit()
+
+    notification_email = _verified_notification_email(current_user)
+    if notification_email is not None:
+        await _maybe_await_delivery(
+            send_password_security_notification(
+                email=notification_email,
+                action="changed",
+                occurred_at=now,
+                ip_address=request.client.host if request.client else None,
+                user_agent=request.headers.get("user-agent"),
+            )
+        )
 
     return {"success": True}
 

@@ -517,6 +517,60 @@ async def send_new_device_login_notification(
     )
 
 
+async def send_password_security_notification(
+    *,
+    email: str,
+    action: str,
+    occurred_at: datetime,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+) -> None:
+    timestamp = _format_security_datetime(occurred_at)
+    action_label = "создан" if action == "created" else "изменен"
+    subject = (
+        "Пароль создан в Мой Герцена"
+        if action == "created"
+        else "Пароль изменен в Мой Герцена"
+    )
+    ip_label = ip_address or "неизвестного IP"
+    user_agent_label = normalize_optional_string(user_agent)
+    user_agent_html = (
+        f'<p style="margin:0 0 16px;">User-Agent: '
+        f'<span style="word-break:break-all;">{escape(user_agent_label)}</span></p>'
+        if user_agent_label
+        else ""
+    )
+    body_html = (
+        f'<p style="margin:0 0 16px;"><strong>{escape(timestamp)} пароль вашего '
+        f'аккаунта был {escape(action_label)} с использованием IP {escape(ip_label)}.</strong></p>'
+        f"{user_agent_html}"
+        "<p style=\"margin:0 0 16px;\">Вы получили это уведомление, потому что "
+        "изменились настройки входа в ваш аккаунт.</p>"
+        "<p style=\"margin:0;\">Если вы не выполняли это действие, пожалуйста, "
+        "немедленно свяжитесь с технической поддержкой Мой Герцена.</p>"
+    )
+    text_lines = [
+        f"{timestamp} пароль вашего аккаунта был {action_label} с использованием IP {ip_label}.",
+    ]
+    if user_agent_label:
+        text_lines.append(f"User-Agent: {user_agent_label}")
+    text_lines.extend(
+        [
+            "Вы получили это уведомление, потому что изменились настройки входа в ваш аккаунт.",
+            "Если это были не вы, свяжитесь с технической поддержкой Мой Герцена.",
+        ]
+    )
+
+    await _send_template_email(
+        action=f"password_{action}",
+        email=email,
+        subject=subject,
+        text="\n".join(text_lines),
+        body_html=body_html,
+        raise_on_failure=False,
+    )
+
+
 def normalize_datetime(value: Optional[datetime]) -> Optional[datetime]:
     if value is None:
         return None

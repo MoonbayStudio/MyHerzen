@@ -458,6 +458,59 @@ def test_password_login_sends_new_device_notification(monkeypatch):
     assert sent_notifications[0]["platform"] == "android"
 
 
+def test_password_create_sends_security_notification(monkeypatch):
+    db = TestingSessionLocal()
+    user = _create_user(db, email="create-password@example.com", apple_sub="create-password-sub")
+    token, _session = _create_tracked_session(db, user.id)
+    sent_notifications = []
+
+    monkeypatch.setattr(
+        "app.routers.auth.send_password_security_notification",
+        lambda **kwargs: sent_notifications.append(kwargs),
+    )
+
+    response = client.post(
+        "/me/password/create",
+        json={"password": "Password123"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "password_created"
+    assert len(sent_notifications) == 1
+    assert sent_notifications[0]["email"] == "create-password@example.com"
+    assert sent_notifications[0]["action"] == "created"
+
+
+def test_password_change_sends_security_notification(monkeypatch):
+    db = TestingSessionLocal()
+    user = _create_user(db, email="change-password@example.com", apple_sub="change-password-sub")
+    user.password_hash = hash_password("OldPassword123")
+    db.commit()
+    token, _session = _create_tracked_session(db, user.id)
+    sent_notifications = []
+
+    monkeypatch.setattr(
+        "app.routers.auth.send_password_security_notification",
+        lambda **kwargs: sent_notifications.append(kwargs),
+    )
+
+    response = client.post(
+        "/me/password/change",
+        json={
+            "currentPassword": "OldPassword123",
+            "newPassword": "NewPassword123",
+        },
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    assert len(sent_notifications) == 1
+    assert sent_notifications[0]["email"] == "change-password@example.com"
+    assert sent_notifications[0]["action"] == "changed"
+
+
 def test_provider_email_contact_verification_rules():
     apple_user = User(apple_sub="apple-contact-rules-sub")
     apply_apple_email_to_user(
