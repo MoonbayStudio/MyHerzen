@@ -98,7 +98,10 @@ SMTP_FALLBACK_PORTS = [
     for port in os.getenv("SMTP_FALLBACK_PORTS", "587").split(",")
     if port.strip().isdigit()
 ]
-EMAIL_LOGO_PATH = os.getenv("EMAIL_LOGO_PATH", "logomh.png")
+EMAIL_LOGO_URL = os.getenv(
+    "EMAIL_LOGO_URL",
+    f"{FRONTEND_BASE_URL}/img/logo.png",
+)
 
 GOOGLE_CLIENT_IDS = [
     cid.strip()

@@ -1,11 +1,9 @@
 import hashlib
-import mimetypes
 import secrets
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 from email.utils import formataddr
 from html import escape
-from pathlib import Path
 from typing import Any, Optional
 
 import requests
@@ -15,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import (
     APPLE_KEYS_URL,
-    EMAIL_LOGO_PATH,
+    EMAIL_LOGO_URL,
     EMAIL_VERIFICATION_EXPIRES_HOURS,
     FRONTEND_BASE_URL,
     SMTP_FROM_EMAIL,
@@ -187,38 +185,18 @@ def _raise_email_delivery_error(
     raise HTTPException(status_code=502, detail=EMAIL_DELIVERY_ERROR_DETAIL)
 
 
-def _find_email_logo_path() -> Optional[Path]:
-    configured_path = Path(EMAIL_LOGO_PATH).expanduser()
-    candidates = [
-        configured_path,
-        Path.cwd() / configured_path,
-        Path(__file__).resolve().parents[2] / configured_path,
-        Path(__file__).resolve().parents[3] / configured_path,
-        Path(__file__).resolve().parents[3]
-        / "Web"
-        / "myherzen.moonbaystudio.ru"
-        / "img"
-        / "logo.png",
-    ]
-
-    for candidate in candidates:
-        if candidate.exists() and candidate.is_file():
-            return candidate
-
-    return None
-
-
 def _build_email_layout(
     *,
     title: str,
     body_html: str,
-    include_logo: bool,
+    logo_url: Optional[str],
 ) -> str:
     support_url = f"{FRONTEND_BASE_URL}/support/"
+    safe_logo_url = escape(logo_url, quote=True) if logo_url else None
     logo_html = (
-        '<img src="cid:myherzen-logo" width="40" height="40" alt="Мой Герцена" '
+        f'<img src="{safe_logo_url}" width="40" height="40" alt="Мой Герцена" '
         'style="display:block;border:0;border-radius:10px;">'
-        if include_logo
+        if safe_logo_url
         else (
             '<div style="width:40px;height:40px;border-radius:10px;'
             'background:#3358ff;"></div>'
@@ -275,25 +253,6 @@ def _build_email_layout(
 </html>"""
 
 
-def _attach_inline_logo(message: EmailMessage, logo_path: Optional[Path]) -> None:
-    if logo_path is None:
-        return
-
-    content_type = mimetypes.guess_type(str(logo_path))[0] or "image/png"
-    maintype, _, subtype = content_type.partition("/")
-    if maintype != "image" or not subtype:
-        maintype, subtype = "image", "png"
-
-    html_part = message.get_payload()[-1]
-    html_part.add_related(
-        logo_path.read_bytes(),
-        maintype=maintype,
-        subtype=subtype,
-        cid="<myherzen-logo>",
-        filename=logo_path.name,
-    )
-
-
 async def _send_template_email(
     *,
     action: str,
@@ -324,7 +283,6 @@ async def _send_template_email(
         )
         return
 
-    logo_path = _find_email_logo_path()
     message = EmailMessage()
     message["From"] = formataddr((SMTP_FROM_NAME, SMTP_FROM_EMAIL))
     message["To"] = email
@@ -334,11 +292,10 @@ async def _send_template_email(
         _build_email_layout(
             title=subject,
             body_html=body_html,
-            include_logo=logo_path is not None,
+            logo_url=normalize_optional_string(EMAIL_LOGO_URL),
         ),
         subtype="html",
     )
-    _attach_inline_logo(message, logo_path)
 
     last_error: Optional[Exception] = None
     attempted_ports = []
