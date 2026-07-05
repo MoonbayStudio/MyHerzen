@@ -139,6 +139,10 @@ text MyHerzen ├── iOS ├── Android ├── API ├── Web └─
 - мобильные приложения для iOS и Android;
 - административная панель.
 
+Подробный журнал развития и ближайший roadmap:
+
+[PROGRESS.md](PROGRESS.md)
+
 ---
 
 ## Ссылки
