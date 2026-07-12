@@ -1,31 +1,48 @@
-services:
-  myherzen-api:
-    build: .
-    container_name: myherzen-api
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:8000:8000"
-    env_file:
-      - .env
-      - modules.flags.env
-    environment:
-      DATABASE_URL: "postgresql://myherzen:${DATABASE_PASSWORD}@myherzen-db:5432/myherzen"
-      PYTHONPATH: /app
-    depends_on:
-      - myherzen-db
+name: myherzen
 
-  myherzen-db:
-    image: postgres:16
-    container_name: myherzen-db
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      POSTGRES_DB: myherzen
-      POSTGRES_USER: myherzen
-      POSTGRES_PASSWORD: "${DATABASE_PASSWORD}"
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${DATABASE_PASSWORD}@db:5432/${POSTGRES_DB}
+      PYTHONPATH: /app
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${API_BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
     volumes:
-      - myherzen_postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
-  myherzen_postgres_data:
+  postgres_data:

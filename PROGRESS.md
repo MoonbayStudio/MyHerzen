@@ -38,6 +38,40 @@ The largest remaining gaps are not in basic schedule browsing, but in product po
 
 ## Recently Completed
 
+### 2026-07-12 - Student Maintainer Handover Foundation
+
+Goal:
+
+- Make a new, empty MyHerzen backend installation reproducible without
+  transferring existing user accounts.
+
+Completed:
+
+- Replaced the broken root Docker entrypoint with a working API image.
+- Added a single documented Compose stack with PostgreSQL and health checks.
+- Added explicit empty-database initialization.
+- Added safe example configuration with optional AI and SMTP integration.
+- Expanded the root environment template to cover every backend integration and
+  documented API deployment, HTTPS, firewall ports, Ollama, and Swagger access.
+- Added database backup and restore commands.
+- Added setup, operations, and maintainer handover documentation.
+- Added backend test and container-build CI.
+- Made browser CORS origins configurable for student-operated deployments.
+
+Verification:
+
+- Backend suite: 43 tests passed.
+- Empty SQLite database initialization created 20 expected tables.
+- Docker Compose configuration parsed successfully.
+- Full container build was not run because Docker Desktop was not active.
+
+Remaining:
+
+- Replace the legacy schema bootstrap with versioned Alembic migrations.
+- Move mobile API addresses and signing identifiers into build configuration.
+- Test the documented flow from a clean clone on a second machine.
+- Add production reverse-proxy and release procedures.
+
 ### 2026-06-25 - Android Parity Foundation
 
 Completed:
