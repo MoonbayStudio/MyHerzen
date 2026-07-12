@@ -1,40 +1,41 @@
 # MyHerzen
 
-MyHerzen is an independent, open-source application for students of the Herzen
-State Pedagogical University of Russia. It combines schedules, study groups,
-homework, notifications and optional AI assistants across iOS, Android and web.
+MyHerzen — независимое приложение с открытым исходным кодом для студентов РГПУ
+им. А. И. Герцена. Оно объединяет расписание, учебные группы, домашние задания,
+уведомления и необязательных AI-помощников на iOS, Android и в веб-интерфейсе.
 
-The repository is intended to remain maintainable by Herzen students. A fresh
-installation starts with an empty database; transferring existing user accounts
-is not required.
+Репозиторий подготовлен так, чтобы проект могли сопровождать студенты Герцена.
+Новую установку можно запустить с пустой базой данных — перенос существующих
+аккаунтов пользователей не требуется.
 
-## Open for use and continuation
+## Проект открыт для использования и продолжения
 
-MyHerzen is open for use, self-hosting, study, modification and continued
-development under the Apache License 2.0. Herzen students and student teams are
-welcome to clone or fork the repository, deploy their own installation and keep
-the official student service alive after the original maintainer leaves.
+MyHerzen открыт для использования, самостоятельного размещения, изучения,
+изменения и дальнейшей разработки по лицензии Apache License 2.0. Студенты и
+студенческие команды могут клонировать или форкать репозиторий, разворачивать
+собственную установку и продолжать работу официального студенческого сервиса
+после ухода первоначального сопровождающего.
 
-The project is deliberately documented so that a new team can start with an
-empty database and its own server, domains, OAuth applications, Ollama model and
-email provider. No private user-account database or access to the original
-maintainer's infrastructure is required to continue development.
+Проект документирован так, чтобы новая команда могла начать с пустой базы
+данных, собственного сервера, доменов, приложений OAuth, модели Ollama и
+почтового провайдера. Для продолжения разработки не требуются исходная база
+пользовательских аккаунтов или доступ к инфраструктуре прежнего владельца.
 
-## Components
+## Состав проекта
 
-- `API/` — FastAPI, SQLAlchemy and PostgreSQL backend;
-- `Android/` — Kotlin and Jetpack Compose application;
-- `iOS/` — SwiftUI application, widgets and Live Activities;
-- `Web/` — static public website and account pages;
-- `tests/` — backend test suite.
+- `API/` — backend на FastAPI, SQLAlchemy и PostgreSQL;
+- `Android/` — приложение на Kotlin и Jetpack Compose;
+- `iOS/` — приложение на SwiftUI, виджеты и Live Activities;
+- `Web/` — статический сайт и страницы аккаунта;
+- `tests/` — тесты backend.
 
-## Start the backend locally
+## Локальный запуск backend
 
-Requirements:
+Требования:
 
-- Docker Desktop, Docker Engine or another Docker Compose-compatible runtime;
+- Docker Desktop, Docker Engine или другая среда с поддержкой Docker Compose;
 - Git;
-- ports `8000` and PostgreSQL's internal container network available.
+- свободный порт `8000` и доступная внутренняя сеть контейнеров PostgreSQL.
 
 ```bash
 git clone https://github.com/MoonbayStudio/MyHerzen.git
@@ -42,34 +43,34 @@ cd MyHerzen
 make setup
 ```
 
-Open `.env` and work through it from top to bottom. Every external dependency is
-listed there: PostgreSQL, public URLs, the Herzen API, Apple/Google OAuth,
-Ollama, SMTP, feature switches and mobile integrity checks. At minimum, replace
-`DATABASE_PASSWORD`, `JWT_SECRET`, `FRONTEND_BASE_URL`, `OWNER_EMAILS` and
-`ADMIN_EMAILS`. Optional integrations can remain empty or disabled. Then start
-the services:
+Откройте `.env` и последовательно заполните его разделы. В нём перечислены все
+внешние зависимости: PostgreSQL, публичные адреса, API Герцена, Apple/Google
+OAuth, Ollama, SMTP, функциональные переключатели и проверки целостности
+мобильных приложений. Как минимум замените `DATABASE_PASSWORD`, `JWT_SECRET`,
+`FRONTEND_BASE_URL`, `OWNER_EMAILS` и `ADMIN_EMAILS`. Необязательные интеграции
+можно оставить пустыми или выключенными. После этого запустите сервисы:
 
 ```bash
 make up
 curl http://127.0.0.1:8000/health
 ```
 
-The expected response is:
+Ожидаемый ответ:
 
 ```json
 {"status":"healthy"}
 ```
 
-API documentation is available at <http://127.0.0.1:8000/docs>. AI, SMTP and
-third-party sign-in are optional and disabled or left unconfigured in the basic
-local setup.
+Документация API будет доступна по адресу <http://127.0.0.1:8000/docs>. В
+базовой локальной конфигурации AI, SMTP и вход через сторонние сервисы можно не
+настраивать.
 
-For an internet-facing server, publish only TCP ports `80` and `443` through a
-TLS reverse proxy. Keep API port `8000`, PostgreSQL and Ollama closed to the
-public internet. The complete server and firewall procedure is in
+На сервере, доступном из интернета, открывайте только TCP-порты `80` и `443`
+через reverse proxy с TLS. Не открывайте в интернет порт API `8000`, PostgreSQL
+и Ollama. Полная инструкция по серверу и firewall находится в
 [SETUP.md](docs/SETUP.md).
 
-Useful commands:
+Полезные команды:
 
 ```bash
 make status
@@ -79,17 +80,17 @@ make backup
 make restore FILE=backups/myherzen-YYYYMMDD-HHMMSS.sql
 ```
 
-## Documentation
+## Документация
 
-- [Installation and configuration](docs/SETUP.md)
-- [Operations, database backup and recovery](docs/OPERATIONS.md)
-- [Project handover checklist](docs/HANDOVER.md)
-- [Current development progress](PROGRESS.md)
+- [Установка и настройка](docs/SETUP.md)
+- [Эксплуатация, резервное копирование и восстановление БД](docs/OPERATIONS.md)
+- [Чек-лист передачи проекта](docs/HANDOVER.md)
+- [Текущий прогресс разработки](PROGRESS.md)
 
-## Development
+## Разработка
 
-Backend tests use an isolated SQLite database and do not require the Docker
-stack:
+Тесты backend используют изолированную базу SQLite и не требуют запуска
+контейнеров:
 
 ```bash
 python3.12 -m venv .venv
@@ -98,23 +99,23 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-Android requires JDK 17 and Android SDK 34:
+Для Android требуются JDK 17 и Android SDK 34:
 
 ```bash
 cd Android
 ./gradlew assembleDebug
 ```
 
-The iOS project is opened from `iOS/MyHerzen.xcodeproj`. Building a distributable
-app requires an Apple Developer team and replacement bundle identifiers.
+Проект iOS открывается из `iOS/MyHerzen.xcodeproj`. Для сборки распространяемого
+приложения потребуются команда Apple Developer и собственные bundle identifiers.
 
-## Production note
+## Примечание о production-развёртывании
 
-The Compose configuration binds the API to `127.0.0.1` by default. In
-production, keep that binding and place a TLS reverse proxy such as Caddy or
-nginx in front of it. Do not commit `.env`, database dumps, OAuth credentials or
-signing keys.
+По умолчанию Compose привязывает API к `127.0.0.1`. На production-сервере
+сохраните эту привязку и установите перед API reverse proxy с TLS, например
+Caddy или nginx. Не добавляйте в Git файл `.env`, дампы базы данных, данные OAuth
+или ключи подписи.
 
-## License
+## Лицензия
 
-Licensed under the [Apache License 2.0](LICENSE).
+Проект распространяется по лицензии [Apache License 2.0](LICENSE).
