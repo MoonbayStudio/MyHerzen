@@ -1,176 +1,120 @@
 # MyHerzen
 
-MyHerzen — это независимый образовательный проект для студентов РГПУ им. А. И. Герцена.
+MyHerzen is an independent, open-source application for students of the Herzen
+State Pedagogical University of Russia. It combines schedules, study groups,
+homework, notifications and optional AI assistants across iOS, Android and web.
 
-Проект объединяет расписание занятий, работу с учебными группами, домашними заданиями, уведомлениями и AI-помощниками в единой экосистеме, доступной на iOS, Android и через веб-интерфейс.
+The repository is intended to remain maintainable by Herzen students. A fresh
+installation starts with an empty database; transferring existing user accounts
+is not required.
 
----
+## Open for use and continuation
 
-## Возможности
+MyHerzen is open for use, self-hosting, study, modification and continued
+development under the Apache License 2.0. Herzen students and student teams are
+welcome to clone or fork the repository, deploy their own installation and keep
+the official student service alive after the original maintainer leaves.
 
-### Расписание
+The project is deliberately documented so that a new team can start with an
+empty database and its own server, domains, OAuth applications, Ollama model and
+email provider. No private user-account database or access to the original
+maintainer's infrastructure is required to continue development.
 
-- Просмотр расписания по группам
-- Быстрое переключение между датами
-- Автоматическое обновление данных
-- Поддержка Live Activities на iPhone
-- Адаптация интерфейса под разные версии iOS
+## Components
 
-### Учебные группы
+- `API/` — FastAPI, SQLAlchemy and PostgreSQL backend;
+- `Android/` — Kotlin and Jetpack Compose application;
+- `iOS/` — SwiftUI application, widgets and Live Activities;
+- `Web/` — static public website and account pages;
+- `tests/` — backend test suite.
 
-- Выбор и смена группы
-- Список участников группы
-- Роли участников
-- Подтверждение заявок старостами
-- Управление приглашениями
+## Start the backend locally
 
-### Домашние задания
+Requirements:
 
-- Просмотр домашних заданий
-- Добавление и редактирование заданий
-- Фильтрация по дате и занятию
-- Управление доступом через роли
+- Docker Desktop, Docker Engine or another Docker Compose-compatible runtime;
+- Git;
+- ports `8000` and PostgreSQL's internal container network available.
 
-### Аккаунт
+```bash
+git clone https://github.com/MoonbayStudio/MyHerzen.git
+cd MyHerzen
+make setup
+```
 
-- Авторизация через Apple
-- Авторизация через Google
-- Система сессий
-- Управление устройствами
-- Смена контактной почты
-- Настройка пароля
+Open `.env` and work through it from top to bottom. Every external dependency is
+listed there: PostgreSQL, public URLs, the Herzen API, Apple/Google OAuth,
+Ollama, SMTP, feature switches and mobile integrity checks. At minimum, replace
+`DATABASE_PASSWORD`, `JWT_SECRET`, `FRONTEND_BASE_URL`, `OWNER_EMAILS` and
+`ADMIN_EMAILS`. Optional integrations can remain empty or disabled. Then start
+the services:
 
-### AI-помощники
+```bash
+make up
+curl http://127.0.0.1:8000/health
+```
 
-- Пеликаша
-- Стеша
-- Контекст расписания
-- Тематические сезонные персонажи
-- Гибкая система персон
+The expected response is:
 
-### Администрирование
+```json
+{"status":"healthy"}
+```
 
-- Управление ролями
-- Управление бейджами
-- Системные уведомления
-- Runtime-настройки
-- Модерация заявок
+API documentation is available at <http://127.0.0.1:8000/docs>. AI, SMTP and
+third-party sign-in are optional and disabled or left unconfigured in the basic
+local setup.
 
----
+For an internet-facing server, publish only TCP ports `80` and `443` through a
+TLS reverse proxy. Keep API port `8000`, PostgreSQL and Ollama closed to the
+public internet. The complete server and firewall procedure is in
+[SETUP.md](docs/SETUP.md).
 
-## Платформы
+Useful commands:
 
-### iOS
+```bash
+make status
+make logs
+make down
+make backup
+make restore FILE=backups/myherzen-YYYYMMDD-HHMMSS.sql
+```
 
-- SwiftUI
-- iOS 15+
-- iOS 26 Liquid Glass
-- Live Activities
-- WidgetKit
+## Documentation
 
-### Android
+- [Installation and configuration](docs/SETUP.md)
+- [Operations, database backup and recovery](docs/OPERATIONS.md)
+- [Project handover checklist](docs/HANDOVER.md)
+- [Current development progress](PROGRESS.md)
 
-- Kotlin
-- Jetpack Compose
-- Room
-- Retrofit
-- Hilt
+## Development
 
-### Backend
+Backend tests use an isolated SQLite database and do not require the Docker
+stack:
 
-- Python
-- FastAPI
-- PostgreSQL
-- SQLAlchemy
-- Docker
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+pytest
+```
 
-### Web
+Android requires JDK 17 and Android SDK 34:
 
-- HTML
-- CSS
-- JavaScript
+```bash
+cd Android
+./gradlew assembleDebug
+```
 
----
+The iOS project is opened from `iOS/MyHerzen.xcodeproj`. Building a distributable
+app requires an Apple Developer team and replacement bundle identifiers.
 
-## Архитектура проекта
+## Production note
 
-text MyHerzen ├── iOS ├── Android ├── API ├── Web └── Docker 
+The Compose configuration binds the API to `127.0.0.1` by default. In
+production, keep that binding and place a TLS reverse proxy such as Caddy or
+nginx in front of it. Do not commit `.env`, database dumps, OAuth credentials or
+signing keys.
 
----
+## License
 
-## Стек технологий
-
-### Клиентская часть
-
-- SwiftUI
-- Kotlin
-- Jetpack Compose
-- WidgetKit
-
-### Серверная часть
-
-- FastAPI
-- PostgreSQL
-- SQLAlchemy
-- Docker
-- Caddy
-
-### Инфраструктура
-
-- Ubuntu Server
-- Docker Compose
-- Tailscale
-- Netdata
-
----
-
-## Статус проекта
-
-Проект находится в активной разработке.
-
-Сейчас реализованы:
-
-- аккаунты пользователей;
-- роли и бейджи;
-- группы;
-- домашние задания;
-- AI-чат;
-- веб-сайт проекта;
-- мобильные приложения для iOS и Android;
-- административная панель.
-
-Подробный журнал развития и ближайший roadmap:
-
-[PROGRESS.md](PROGRESS.md)
-
----
-
-## Ссылки
-
-Сайт проекта:
-
-https://myherzen.moonbaystudio.ru
-
-API:
-
-https://api.myherzen.moonbaystudio.ru
-
-Студия-разработчик:
-
-https://moonbaystudio.ru
-
----
-
-## Автор
-
-Разработка и сопровождение:
-
-Nicolas Forest
-
-Moonbay Studio
-
----
-
-## Лицензия
-
-Проект распространяется в соответствии с выбранной лицензией репозитория.
+Licensed under the [Apache License 2.0](LICENSE).

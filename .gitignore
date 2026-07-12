@@ -125,6 +125,8 @@ temp/
 # Dumps
 # =========================
 *.hprof
+backups/*
+!backups/.gitkeep
 
 # =========================
 # Project-specific

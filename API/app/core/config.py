@@ -57,6 +57,15 @@ FRONTEND_BASE_URL = os.getenv(
     "https://myherzen.moonbaystudio.ru"
 ).rstrip("/")
 
+CORS_ORIGINS = [
+    origin.strip().rstrip("/")
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        "https://myherzen.moonbaystudio.ru",
+    ).split(",")
+    if origin.strip()
+]
+
 HERZEN_API_TIMEOUT_SECONDS = 15
 
 ADMIN_EMAILS = os.getenv("ADMIN_EMAILS", "")
