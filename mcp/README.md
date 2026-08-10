@@ -1,55 +1,59 @@
 # Herzen MCP
 
-Connect official Herzen University schedule data to your usual AI assistant.
+Подключите официальное расписание РГПУ им. А. И. Герцена к своему привычному
+ИИ-ассистенту.
 
-Ask things like:
+Задавайте вопросы, например:
 
 - «Какие у меня пары сегодня?»
 - «Во сколько в пятницу заканчиваются пары?»
 - «Успею ли я после пар зайти в спортзал?»
 - «Найди мою группу ИВТ»
 
-The server does not contain an LLM and does not replace ChatGPT, Claude, Gemini,
-or another MCP-capable client. It gives that client structured, read-only data;
-the client combines it with the conversation, its own memory, calendar, maps, or
-other tools.
+Сервер не содержит собственной языковой модели и не заменяет ChatGPT, Claude,
+Gemini или другой клиент с поддержкой MCP. Он предоставляет клиенту
+структурированные данные только для чтения, а клиент объединяет их с контекстом
+диалога, собственной памятью, календарём, картами и другими инструментами.
 
-## MVP scope
+## Возможности MVP
 
-This first version implements milestones 1-2:
+В первой версии реализованы этапы 1–2:
 
-- stateless Streamable HTTP endpoint at `POST /mcp`;
-- healthcheck at `GET /health`;
+- точка подключения Streamable HTTP без хранения состояния по адресу
+  `POST /mcp`;
+- проверка состояния сервера через `GET /health`;
 - `search_groups`;
 - `get_schedule`;
-- normalized data from the public official Herzen schedule API.
+- нормализованные данные из публичного официального API расписания Герцена.
 
-Knowledge search, crawling, OAuth, accounts, and write operations are not part
-of this MVP.
+Поиск по базе знаний, сбор данных с сайтов, OAuth, аккаунты и операции записи в
+этот MVP не входят.
 
-## How the group is remembered
+## Как запоминается группа
 
-There is intentionally no Herzen MCP account in this version. The user can tell
-their AI, for example, «Моя группа — 1б-ИВТ-1/26». A client with conversation or
-profile memory can pass that group to `get_schedule` later. If it does not know
-the group, the tool description instructs it to ask the user or call
-`search_groups`; the server never guesses among multiple matches.
+В этой версии у Herzen MCP намеренно нет собственной системы аккаунтов.
+Пользователь может сказать своему ИИ, например: «Моя группа — 1б-ИВТ-1/26».
+Клиент с памятью диалога или профиля сможет позднее передать эту группу в
+`get_schedule`. Если группа неизвестна, описание инструмента предписывает
+спросить её у пользователя или вызвать `search_groups`; сервер никогда не
+выбирает случайный вариант при нескольких совпадениях.
 
-## Tools
+## Инструменты
 
 ### `search_groups`
 
-Input:
+Входные данные:
 
 ```json
 { "query": "ИВТ" }
 ```
 
-Returns official group IDs, names, and their faculty/institute.
+Возвращает официальные идентификаторы и названия групп, а также соответствующие
+факультеты или институты.
 
 ### `get_schedule`
 
-Input:
+Входные данные:
 
 ```json
 {
@@ -59,13 +63,14 @@ Input:
 }
 ```
 
-`group` may be an official numeric ID or an unambiguous name. Dates are optional;
-without them the server returns today plus the next six days in
-`Europe/Moscow`. The maximum range is 31 days.
+В `group` можно передать официальный числовой идентификатор или однозначное
+название группы. Даты необязательны: без них сервер возвращает расписание на
+сегодня и следующие шесть дней в часовом поясе `Europe/Moscow`. Максимальный
+диапазон — 31 день.
 
-## Development
+## Разработка
 
-Requirements: Node.js 22 or newer.
+Требуется Node.js 22 или новее.
 
 ```bash
 cp .env.example .env
@@ -74,15 +79,15 @@ npm test
 npm run dev
 ```
 
-Then check:
+Затем проверьте сервер:
 
 ```bash
 curl http://localhost:3000/health
 ```
 
-The integration suite starts a real local HTTP server and verifies MCP
-initialization, `tools/list`, both `tools/call` paths, structured output, and
-schema rejection.
+Интеграционные тесты запускают настоящий локальный HTTP-сервер и проверяют
+инициализацию MCP, `tools/list`, оба сценария `tools/call`, структурированный
+результат и отклонение данных, не соответствующих схемам.
 
 ## Docker
 
@@ -90,28 +95,34 @@ schema rejection.
 docker compose up --build
 ```
 
-In production, put the service behind an HTTPS reverse proxy and expose a stable
-URL such as `https://mcp.example.org/mcp`. Configure that URL in any client that
-supports remote MCP over Streamable HTTP. Client-specific availability and setup
-steps can change; check the current documentation for the chosen AI client. If
-there is exactly one trusted reverse proxy, set `TRUST_PROXY_HOPS=1` so per-client
-rate limiting uses the forwarded address; leave the secure default `0` otherwise.
+В рабочем окружении разместите сервис за обратным HTTPS-прокси и
+предоставьте постоянный URL, например `https://mcp.example.org/mcp`. Укажите его
+в любом клиенте, который поддерживает удалённый MCP через Streamable HTTP.
+Доступность функции и порядок настройки зависят от конкретного ИИ-клиента и
+могут меняться, поэтому сверяйтесь с его актуальной документацией.
 
-## Privacy and security
+Если перед приложением находится ровно один доверенный обратный прокси,
+установите `TRUST_PROXY_HOPS=1`, чтобы ограничение частоты запросов учитывало
+адрес клиента. В остальных случаях оставьте безопасное значение по умолчанию
+`0`.
 
-- read-only tools only;
-- no account, token, prompt, or personal-profile storage;
-- no arbitrary URL input;
-- the upstream hostname is restricted to `api.herzen.spb.ru` over HTTPS;
-- bounded inputs, date ranges, request bodies, upstream time, and response size;
-- per-IP MCP rate limiting;
-- structured logs exclude prompts and group values.
+## Конфиденциальность и безопасность
 
-All schedule results identify the official upstream source. Empty days are
-returned explicitly. Upstream failures use stable error codes and are never
-presented as fresh cached data.
+- доступны только инструменты для чтения;
+- сервер не хранит аккаунты, токены, запросы пользователя и персональные
+  профили;
+- модель не может передать произвольный URL;
+- обращения к внешнему API разрешены только к `api.herzen.spb.ru` по HTTPS;
+- ограничены входные данные, диапазон дат, размер тела запроса, время ожидания и
+  размер ответа официального API;
+- частота MCP-запросов ограничивается отдельно для каждого IP-адреса;
+- структурированные логи не содержат запросы пользователя и значения групп.
 
-## Project notes
+Каждый результат расписания содержит ссылку на официальный источник. Дни без
+занятий возвращаются явно. Ошибки официального API имеют стабильные коды и
+никогда не выдаются за актуальные данные из кеша.
 
-The audited MyHerzen API flow and implementation decisions are documented in
-[`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md).
+## Техническая документация
+
+Проверенная схема взаимодействия MyHerzen с API и принятые технические решения
+описаны в [`IMPLEMENTATION_PLAN.md`](./IMPLEMENTATION_PLAN.md).
