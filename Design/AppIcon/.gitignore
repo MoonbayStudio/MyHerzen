@@ -1,0 +1,7 @@
+# Regenerated inspection artifacts and scratch screenshots stay local.
+QA/*.png
+Verification/*.png
+Verification/*.ax.json
+Source/herzenicon-reference-original.png
+Layers/*-white.png
+Layers/*-monochrome.png

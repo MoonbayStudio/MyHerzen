@@ -1,0 +1,30 @@
+{
+  "colorSpace" : "sRGB",
+  "Dark" : {
+    "antialiasEdge95PercentileRGBError0to255" : 0.98416020400472359,
+    "boundsAlphaGreaterThan8" : [
+      121,
+      121,
+      902,
+      901
+    ],
+    "coveragePixelsAfterScale" : 216123,
+    "coveragePixelsBeforeScale" : 297782,
+    "reconstructionMeanAbsoluteRGBError0to255" : 0.52808431097575892
+  },
+  "Light" : {
+    "antialiasEdge95PercentileRGBError0to255" : 2.3068003215686774,
+    "boundsAlphaGreaterThan8" : [
+      122,
+      121,
+      901,
+      901
+    ],
+    "coveragePixelsAfterScale" : 229905,
+    "coveragePixelsBeforeScale" : 321020,
+    "reconstructionMeanAbsoluteRGBError0to255" : 0.76568793195917384
+  },
+  "lightColor" : "#264796",
+  "note" : "Light negative pelican and dark positive pelican intentionally retain different source geometry. Error metrics measure recolor-neutral source reconstruction; they are not a claim of lossless vector recovery.",
+  "scale" : 0.81999999999999995
+}

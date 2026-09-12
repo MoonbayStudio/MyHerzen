@@ -198,6 +198,13 @@ struct MyHerzenApp: App {
 
     private func updateMacApplicationIcon() {
         DispatchQueue.main.async {
+            // macOS 26 selects Default, Dark and Mono from AppIcon.icon.
+            // A custom bitmap would override that system-managed appearance.
+            if #available(macOS 26.0, *) {
+                NSApplication.shared.applicationIconImage = nil
+                return
+            }
+
             guard activeColorScheme == .dark else {
                 NSApplication.shared.applicationIconImage = nil
                 return

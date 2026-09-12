@@ -1,0 +1,65 @@
+{
+  "contactSheet" : {
+    "file" : "contact-sheet.png",
+    "height" : 2100,
+    "width" : 1520
+  },
+  "description" : "Native Icon Composer exports, not iOS screenshots",
+  "designGeneration" : 26,
+  "exports" : [
+    {
+      "file" : "Apple-Default.png",
+      "rendition" : "Default",
+      "sha256" : "cd0ae6b20cf8290b6888761e47c4b9a783a3928c900a67a99f6ca59f0bedf912"
+    },
+    {
+      "file" : "Apple-Dark.png",
+      "rendition" : "Dark",
+      "sha256" : "dda814afb22b18b2594646b91b57139f2b32fd0b59c37d72fd8fd39c4e55036e"
+    },
+    {
+      "file" : "Apple-ClearLight.png",
+      "rendition" : "ClearLight",
+      "sha256" : "101ad90bbfcf5349a148dc89b4f1890047ed4a2a2defca303b3ac7fa311718e3"
+    },
+    {
+      "file" : "Apple-ClearDark.png",
+      "rendition" : "ClearDark",
+      "sha256" : "931e4de2f1a073246450e6f0f8df06840f6eb02864f8750a7245e4bab1d9fbcc"
+    },
+    {
+      "file" : "Apple-TintedLight.png",
+      "rendition" : "TintedLight",
+      "sha256" : "f02edd4197391d1653548d918806b831681dfe505cb809d41ff794f7a876efd7"
+    },
+    {
+      "file" : "Apple-TintedDark.png",
+      "rendition" : "TintedDark",
+      "sha256" : "0825c7528cc5f2ecd765aef0a5317b3fb64ae2f9b4c5eb018b09fe015ca2d117"
+    }
+  ],
+  "height" : 1024,
+  "ictoolVersion" : {
+    "bundle-version" : "123",
+    "short-bundle-version" : "2.0"
+  },
+  "platform" : "iOS",
+  "regenerate" : "DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift scripts/preview-apple-app-icons.swift --design-generation 26",
+  "scale" : 1,
+  "sources" : [
+    {
+      "file" : "iOS/MyHerzen/AppIcon.icon/Assets/MyHerzen-Dark-foreground.png",
+      "sha256" : "b0ef80cf8db5d622acd576a7d8b350af09ca624533396200258a5ce3bb2bc06e"
+    },
+    {
+      "file" : "iOS/MyHerzen/AppIcon.icon/Assets/MyHerzen-Light-foreground.png",
+      "sha256" : "cda67acc9f061da77c72670f64b8c8b889f392339429ff6e85d874b1cbae67ba"
+    },
+    {
+      "file" : "iOS/MyHerzen/AppIcon.icon/icon.json",
+      "sha256" : "179ccffc03898dab53b3a45e4545e3e71ca4ea01aa48259990472a85c5fd1eae"
+    }
+  ],
+  "tint" : "Icon Composer defaults; no tint-color or tint-strength override",
+  "width" : 1024
+}

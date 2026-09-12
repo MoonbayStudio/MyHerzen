@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Мой Герцена — варианты иконки</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #1e293b; background: #f3f4f6; font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    main { max-width: 1160px; margin: auto; padding: 44px 24px 56px; }
+    .kicker { margin: 0 0 12px; font-size: 13px; font-weight: 700; letter-spacing: .1em; color: #526176; }
+    h1 { margin: 0 0 12px; font-size: clamp(30px, 4vw, 46px); line-height: 1.15; letter-spacing: -.035em; }
+    .intro { max-width: 850px; margin: 0 0 24px; font-size: 18px; color: #526176; }
+    a { color: #264796; text-underline-offset: 3px; }
+    a:focus-visible { outline: 3px solid #264796; outline-offset: 5px; border-radius: 4px; }
+    .links { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 0 0 30px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+    .card { padding: 24px; background: #e6e8ec; border: 1px solid #dce0e5; border-radius: 22px; min-width: 0; }
+    h2 { margin: 0; font-size: clamp(19px, 2.1vw, 25px); line-height: 1.3; }
+    .card header p { color: #526176; margin: 5px 0 14px; font-size: 14px; }
+    .art { display: block; max-width: 350px; margin: 0 auto 20px; }
+    .art img { display: block; width: 100%; height: auto; }
+    .card footer { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 14px; font-size: 13px; }
+    .sample { display: flex; align-items: center; gap: 12px; color: #526176; }
+    .sample img { display: block; flex: none; }
+    .legend { margin-top: 30px; padding: 24px 28px; border: 1px solid #dce0e5; border-radius: 18px; background: white; }
+    .legend h2 { font-size: 20px; margin-bottom: 10px; }
+    .legend p { margin: 8px 0; color: #526176; }
+    code { overflow-wrap: anywhere; font-size: .9em; }
+    @media (max-width: 640px) { main { padding: 28px 16px; } .grid { grid-template-columns: 1fr; gap: 18px; } .card { padding: 20px; } .legend { padding: 20px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="kicker">МОЙ ГЕРЦЕНА / APP ICON</p>
+    <h1>Шесть вариантов иконки</h1>
+    <p class="intro">Экспорт сохранённого документа Icon Composer. Светлые и тёмные варианты показаны попарно: стандартные, прозрачные и тонированные.</p>
+    <nav class="links" aria-label="Файлы превью"><a href="contact-sheet.png">Общий лист PNG</a><a href="export-metadata.json">Параметры и контрольные суммы</a><a href="../../../scripts/preview-apple-app-icons.swift">Скрипт повторного экспорта</a></nav>
+    <section class="grid" aria-label="Варианты иконки">
+    <article class="card" aria-labelledby="title-Default">
+  <header><h2 id="title-Default">Светлая</h2><p>Default</p></header>
+  <a class="art" href="Apple-Default.png" aria-label="Открыть светлая в исходном размере"><img src="Apple-Default.png" width="1024" height="1024" alt="Мой Герцена — светлая"></a>
+  <footer><div class="sample"><img src="Apple-Default.png" width="60" height="60" alt=""><span>Образец 60 px</span></div><a href="Apple-Default.png" download>PNG · 1024 px</a></footer>
+</article>
+<article class="card" aria-labelledby="title-Dark">
+  <header><h2 id="title-Dark">Тёмная</h2><p>Dark</p></header>
+  <a class="art" href="Apple-Dark.png" aria-label="Открыть тёмная в исходном размере"><img src="Apple-Dark.png" width="1024" height="1024" alt="Мой Герцена — тёмная"></a>
+  <footer><div class="sample"><img src="Apple-Dark.png" width="60" height="60" alt=""><span>Образец 60 px</span></div><a href="Apple-Dark.png" download>PNG · 1024 px</a></footer>
+</article>
+<article class="card" aria-labelledby="title-ClearLight">
+  <header><h2 id="title-ClearLight">Прозрачная · светлая</h2><p>ClearLight</p></header>
+  <a class="art" href="Apple-ClearLight.png" aria-label="Открыть прозрачная · светлая в исходном размере"><img src="Apple-ClearLight.png" width="1024" height="1024" alt="Мой Герцена — прозрачная · светлая"></a>
+  <footer><div class="sample"><img src="Apple-ClearLight.png" width="60" height="60" alt=""><span>Образец 60 px</span></div><a href="Apple-ClearLight.png" download>PNG · 1024 px</a></footer>
+</article>
+<article class="card" aria-labelledby="title-ClearDark">
+  <header><h2 id="title-ClearDark">Прозрачная · тёмная</h2><p>ClearDark</p></header>
+  <a class="art" href="Apple-ClearDark.png" aria-label="Открыть прозрачная · тёмная в исходном размере"><img src="Apple-ClearDark.png" width="1024" height="1024" alt="Мой Герцена — прозрачная · тёмная"></a>
+  <footer><div class="sample"><img src="Apple-ClearDark.png" width="60" height="60" alt=""><span>Образец 60 px</span></div><a href="Apple-ClearDark.png" download>PNG · 1024 px</a></footer>
+</article>
+<article class="card" aria-labelledby="title-TintedLight">
+  <header><h2 id="title-TintedLight">Тонированная · светлая</h2><p>TintedLight</p></header>
+  <a class="art" href="Apple-TintedLight.png" aria-label="Открыть тонированная · светлая в исходном размере"><img src="Apple-TintedLight.png" width="1024" height="1024" alt="Мой Герцена — тонированная · светлая"></a>
+  <footer><div class="sample"><img src="Apple-TintedLight.png" width="60" height="60" alt=""><span>Образец 60 px</span></div><a href="Apple-TintedLight.png" download>PNG · 1024 px</a></footer>
+</article>
+<article class="card" aria-labelledby="title-TintedDark">
+  <header><h2 id="title-TintedDark">Тонированная · тёмная</h2><p>TintedDark</p></header>
+  <a class="art" href="Apple-TintedDark.png" aria-label="Открыть тонированная · тёмная в исходном размере"><img src="Apple-TintedDark.png" width="1024" height="1024" alt="Мой Герцена — тонированная · тёмная"></a>
+  <footer><div class="sample"><img src="Apple-TintedDark.png" width="60" height="60" alt=""><span>Образец 60 px</span></div><a href="Apple-TintedDark.png" download>PNG · 1024 px</a></footer>
+</article>
+    </section>
+    <aside class="legend" aria-labelledby="legend-title">
+      <h2 id="legend-title">Как читать это превью</h2>
+      <p>Все шесть PNG созданы утилитой <code>ictool</code> из <code>iOS/MyHerzen/AppIcon.icon</code>: платформа iOS, Design Generation 26, размер 1024 × 1024 px, scale 1. Тонирование использует параметры Apple по умолчанию.</p>
+      <p><strong>Это экспорт Icon Composer, а не снимки экрана iOS.</strong> Устройство может менять эффекты Clear и Tinted в зависимости от обоев, цвета тонирования и системных настроек. Эта галерея не подтверждает системное переключение вариантов.</p>
+      <p>Большой образец позволяет рассмотреть эмблему; малый показан в размере 60 CSS px. Полноразмерные PNG открываются нажатием на иконку. Фон карточек нейтральный и одинаковый у всех вариантов.</p>
+    </aside>
+  </main>
+</body>
+</html>

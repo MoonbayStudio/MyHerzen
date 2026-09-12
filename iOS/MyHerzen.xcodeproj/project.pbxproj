@@ -106,6 +106,7 @@
 		1B7D7B502FD53F9D0021A5BE /* Exceptions for "MyHerzen" folder in "MyHerzenWidgetExtension" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				AppIcon.icon,
 				Extensions/CalendarDatePicker.swift,
 				"Extensions/Glass+Compat.swift",
 				Extensions/Locallized.swift,
