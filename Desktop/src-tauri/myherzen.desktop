@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Мой Герцена
+GenericName=Расписание и учёба
+Comment={{comment}}
+Exec={{exec}}
+Icon={{icon}}
+Categories={{categories}}
+StartupWMClass={{exec}}
+Terminal=false
+Keywords=расписание;герцена;университет;учёба;schedule;
