@@ -1,0 +1,5 @@
+# Rust build output
+src-tauri/target/
+
+# Local bundle output
+out/

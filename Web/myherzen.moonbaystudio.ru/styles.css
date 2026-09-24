@@ -69,7 +69,15 @@ img {
   position: sticky;
   top: 0;
   z-index: 30;
-  padding: 16px 0 0;
+  padding: 16px 0;
+  /* The bar overlaps page content while scrolling, so it needs its own ground. */
+  background: rgba(5, 8, 22, 0.78);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+body[data-web-theme=light] .top-nav {
+  background: rgba(245, 247, 252, 0.85);
 }
 
 .top-nav-inner {
@@ -1184,4 +1192,183 @@ img {
     align-items: flex-start;
     gap: 12px;
   }
+}
+
+/* ===== Launch hero: headline, product mock, platform-aware actions ===== */
+
+.hero-launch {
+  margin-bottom: 24px;
+  padding: 56px 28px 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--panel);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: var(--shadow);
+}
+
+.hero-launch-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 40px;
+}
+
+.hero-launch-copy h1 {
+  margin: 18px 0 16px;
+  font-size: clamp(34px, 5vw, 60px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.hero-launch-copy p {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--muted);
+  font-size: clamp(15px, 1.3vw, 18px);
+  line-height: 1.6;
+}
+
+.hero-launch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 48px;
+}
+
+.hero-launch-note {
+  margin: 16px 0 0;
+  text-align: center;
+}
+
+.button.large {
+  padding: 18px 30px;
+  font-size: 16px;
+  border-radius: 14px;
+}
+
+.button.accent {
+  background: #264796;
+  color: #fff;
+}
+
+.button.accent:hover {
+  background: #2f56b3;
+}
+
+.button-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.button.no-icon .button-icon {
+  display: none;
+}
+
+/* Product mock: a drawing, not a screenshot, so it never goes stale. */
+.app-mock {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(38, 71, 150, 0.35), rgba(5, 8, 22, 0.75));
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.app-mock-bar {
+  display: flex;
+  gap: 7px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.app-mock-bar span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.app-mock-body {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  min-height: 240px;
+}
+
+.app-mock-side {
+  padding: 14px 10px;
+  border-right: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.app-mock-brand {
+  height: 26px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  background: rgba(125, 211, 252, 0.35);
+}
+
+.app-mock-item {
+  height: 12px;
+  margin-bottom: 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.app-mock-item.is-active {
+  background: rgba(125, 211, 252, 0.55);
+}
+
+.app-mock-main {
+  padding: 16px;
+}
+
+.app-mock-title {
+  width: 42%;
+  height: 14px;
+  margin-bottom: 16px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.app-mock-card {
+  position: relative;
+  padding: 14px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.app-mock-line {
+  height: 9px;
+  margin-bottom: 8px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.16);
+  width: 45%;
+}
+
+.app-mock-line.long {
+  width: 72%;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.app-mock-time {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .hero-launch { padding: 40px 20px 32px; }
+  .hero-launch-top { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .hero-launch-art { order: -1; }
+  .hero-launch-actions { margin-top: 36px; }
+  .hero-launch-actions .button { flex: 1 1 260px; justify-content: center; }
 }

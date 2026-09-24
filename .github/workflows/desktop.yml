@@ -1,0 +1,62 @@
+# Desktop shells for Windows and Linux. Bundles stay as CI artifacts; nothing is published automatically.
+name: desktop
+
+on:
+  push:
+    branches:
+      - codex/myherzen-desktop
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            bundles: deb,appimage
+            artifact: linux-x86_64
+          - os: windows-latest
+            bundles: nsis
+            artifact: windows-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: Desktop/src-tauri
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libssl-dev libayatana-appindicator3-dev \
+            librsvg2-dev libxdo-dev desktop-file-utils xdg-utils patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - run: npm install -g @tauri-apps/cli@^2
+
+      - name: Build bundles
+        working-directory: Desktop
+        run: tauri build --bundles ${{ matrix.bundles }}
+
+      - name: Report artifact checksums
+        shell: bash
+        working-directory: Desktop/src-tauri/target/release/bundle
+        run: find . -type f \( -name '*.deb' -o -name '*.AppImage' -o -name '*.exe' \) -exec sha256sum {} +
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: myherzen-desktop-${{ matrix.artifact }}
+          if-no-files-found: error
+          path: |
+            Desktop/src-tauri/target/release/bundle/**/*.deb
+            Desktop/src-tauri/target/release/bundle/**/*.AppImage
+            Desktop/src-tauri/target/release/bundle/**/*.exe

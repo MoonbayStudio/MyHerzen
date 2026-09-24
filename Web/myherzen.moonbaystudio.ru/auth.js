@@ -12,6 +12,13 @@
   var isGoogleInitialized = false;
   var googleCredentialCallback = null;
 
+  function webDeviceId() {
+    var key = "myherzen_device_id";
+    var value = localStorage.getItem(key);
+    if (!value) { value = window.crypto.randomUUID(); localStorage.setItem(key, value); }
+    return value;
+  }
+
   function setCookie(name, value, days) {
     var expires = "";
     if (days) {
@@ -56,8 +63,10 @@
   }
 
   function logout() {
+    var hadToken = Boolean(getToken());
     localStorage.removeItem(TOKEN_KEY);
     eraseCookie(TOKEN_KEY);
+    if (hadToken) window.dispatchEvent(new CustomEvent("myherzen:logout"));
   }
 
   function getTokenFromResponse(data) {
@@ -337,14 +346,15 @@
     try {
       var data = await authenticateWithCandidates(
         [
-          "/auth/email/login",
-          "/auth/password/login",
-          "/auth/sign-in",
           "/auth/login"
         ],
         {
           email: cleanEmail,
-          password: cleanPassword
+          password: cleanPassword,
+          deviceId: webDeviceId(),
+          deviceName: "Веб-браузер",
+          platform: "web",
+          appVersion: "2026.09.17"
         }
       );
       var user = getUserFromResponse(data) || await fetchCurrentUser();
@@ -381,26 +391,26 @@
     }
 
     try {
-      var data = await authenticateWithCandidates(
-        [
-          "/auth/email/register",
-          "/auth/password/register",
-          "/auth/sign-up",
-          "/auth/register"
-        ],
+      var data = await requestJson(
+        "/auth/signup",
         {
           displayName: cleanName,
-          fullName: cleanName,
           email: cleanEmail,
-          password: cleanPassword
+          password: cleanPassword,
+          deviceId: webDeviceId(),
+          deviceName: "Веб-браузер",
+          platform: "web"
         }
       );
-      var user = getUserFromResponse(data) || await fetchCurrentUser();
+      if (!data || data.status !== "verification_required") {
+        throw new Error("invalid_signup_response");
+      }
 
       return {
         ok: true,
-        message: "Аккаунт создан. Вход выполнен.",
-        user: user
+        verificationRequired: true,
+        email: data.email || cleanEmail,
+        message: "Введите код из письма, чтобы подтвердить почту и завершить регистрацию."
       };
     } catch (error) {
       console.error(error);
@@ -413,6 +423,27 @@
           validation: "Проверьте почту и пароль.",
           fallback: "Не удалось создать аккаунт. Попробуйте позже."
         })
+      };
+    }
+  }
+
+  async function verifySignup(email, code) {
+    try {
+      var data = await requestJson("/auth/signup/verify", {
+        email: email.trim(),
+        code: code.trim(),
+        deviceId: webDeviceId(),
+        deviceName: "Веб-браузер",
+        platform: "web"
+      });
+      saveAuthResponse(data);
+      return { ok: true, user: getUserFromResponse(data) || await fetchCurrentUser() };
+    } catch (error) {
+      return {
+        ok: false,
+        message: error.status === 400
+          ? "Код неверен или истёк. Проверьте почту и код; для нового кода отправьте форму регистрации ещё раз."
+          : "Не удалось подтвердить почту. Попробуйте позже."
       };
     }
   }
@@ -663,6 +694,8 @@
   }
 
   window.MyHerzenAuth = {
+    requestPasswordReset: function (email) { return requestJson("/auth/password/reset-request", { email: email.trim() }); },
+    confirmPasswordReset: function (code, password) { return requestJson("/auth/password/reset-confirm", { code: code.trim(), newPassword: password }); },
     initAppleAuth: initAppleAuth,
     isAppleAuthAvailable: isAppleAuthAvailable,
     initGoogleAuth: initGoogleAuth,
@@ -672,6 +705,7 @@
     loginWithGoogle: loginWithGoogle,
     loginWithEmail: loginWithEmail,
     registerWithEmail: registerWithEmail,
+    verifySignup: verifySignup,
     handleAppleCredential: handleAppleCredential,
     handleGoogleCredential: handleGoogleCredential,
     getUserFromResponse: getUserFromResponse,

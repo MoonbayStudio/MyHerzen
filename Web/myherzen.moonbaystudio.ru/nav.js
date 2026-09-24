@@ -32,6 +32,16 @@
   }
 
   function updateAuthNav() {
+    var navigation = document.querySelector(".top-nav-actions");
+    // Pages marked minimal keep the navigation they declare, nothing is injected.
+    if (navigation && navigation.hasAttribute("data-nav-minimal")) {
+      return;
+    }
+    if (navigation && !navigation.querySelector('a[href="app/"]')) {
+      var schedule = document.createElement("a");
+      schedule.href = "app/"; schedule.className = "nav-pill"; schedule.textContent = "Расписание";
+      navigation.prepend(schedule);
+    }
     var guestLinks = document.querySelectorAll('[data-auth-link="guest"]');
     var accountLinks = document.querySelectorAll('[data-auth-link="account"]');
     var loggedIn = isLoggedIn();
@@ -49,10 +59,10 @@
     } else {
       localStorage.removeItem(TOKEN_KEY);
       document.cookie = TOKEN_KEY + "=; Max-Age=-99999999; path=/; SameSite=Lax";
+      window.dispatchEvent(new CustomEvent("myherzen:logout"));
     }
 
     updateAuthNav();
-    window.dispatchEvent(new CustomEvent("myherzen:logout"));
   }
 
   window.MyHerzenNav = {

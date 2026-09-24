@@ -1,0 +1,23 @@
+# Local Linux build image for the MyHerzen desktop shell.
+# Ubuntu 22.04 keeps glibc at 2.35, so the artifacts run on Ubuntu 22.04+ and Debian 12+.
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      build-essential curl wget file ca-certificates git \
+      libwebkit2gtk-4.1-dev libssl-dev libayatana-appindicator3-dev \
+      librsvg2-dev libxdo-dev pkg-config desktop-file-utils xdg-utils fuse3 \
+      patchelf libgtk-3-bin libgdk-pixbuf2.0-dev librsvg2-bin zsync squashfs-tools \
+      xvfb dbus-x11 x11-utils x11-apps imagemagick fonts-dejavu xdotool \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain stable
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+RUN npm install -g @tauri-apps/cli@^2
+
+WORKDIR /work

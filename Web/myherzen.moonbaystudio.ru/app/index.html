@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <base href="../">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#264796">
+  <title>Мой Герцена — Расписание и учёба</title>
+  <link rel="icon" href="favicon.ico">
+  <link rel="manifest" href="app/manifest.json">
+  <link rel="apple-touch-icon" href="img/icon-192.png">
+  <link rel="stylesheet" href="styles.css?v=20260924-desktop">
+  <link rel="stylesheet" href="workspace.css?v=20260924-desktop">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <nav class="app-sidebar-nav" aria-label="Разделы приложения">
+        <button class="app-nav-item" data-page="schedule" data-title="Расписание" aria-current="page">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+          <span>Расписание</span>
+        </button>
+        <button class="app-nav-item" data-page="exams" data-title="Сессия">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2 9l10 5 10-5-10-5Z"/><path d="M6 12v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/></svg>
+          <span>Сессия</span>
+        </button>
+        <button class="app-nav-item" data-page="admin" data-title="Управление" id="adminTab" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"/></svg>
+          <span>Управление</span>
+        </button>
+      </nav>
+      <div class="app-sidebar-footer">
+        <div class="app-account">
+          <button class="app-account-link" data-page="account" data-title="Аккаунт">
+            <span class="app-account-avatar" id="accountAvatar" aria-hidden="true">?</span>
+            <span class="app-account-text">
+              <strong id="accountName">Аккаунт</strong>
+              <small id="accountRole">Вход не выполнен</small>
+            </span>
+          </button>
+          <button class="app-account-settings" data-page="menu" data-title="Меню" aria-label="Меню" title="Меню">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+    <main class="app-main workspace">
+      <header class="app-topbar">
+        <button type="button" id="backButton" class="app-icon-button app-back" aria-label="Назад" title="Назад" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 6-6 6 6 6"/></svg>
+        </button>
+        <h1 id="appPageTitle">Расписание</h1>
+        <div class="app-topbar-actions" id="scheduleControls">
+          <button type="button" id="refreshSchedule" class="app-icon-button" aria-label="Обновить расписание" title="Обновить">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4.5h-4.5"/></svg>
+          </button>
+          <label class="app-date-button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+            <input id="scheduleDate" type="date" required aria-label="Дата расписания">
+          </label>
+        </div>
+      </header>
+      <div class="app-content">
+    <p id="workspaceStatus" role="status" aria-live="polite" class="auth-message" hidden></p>
+    <aside id="systemNotice" class="panel" hidden><h2 id="noticeTitle"></h2><p id="noticeText"></p><button id="dismissNotice" class="button secondary">Закрыть</button></aside>
+    <section id="accountPage" class="panel section-panel" hidden>
+      <div class="app-profile" id="profileCard" hidden>
+        <span class="app-profile-avatar" id="profileAvatar" aria-hidden="true">?</span>
+        <div class="app-profile-text">
+          <strong id="profileName"></strong>
+          <div class="app-badges" id="profileBadges"></div>
+        </div>
+      </div>
+      <div class="app-rows" id="accountRows"></div>
+    </section>
+    <section id="menuPage" class="panel section-panel" hidden>
+      <div class="app-rows">
+        <button class="app-row" data-page="group" data-title="Выбор группы">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M16 5.5a3 3 0 0 1 0 5.6M18 20c0-2.6-1-4.2-2.6-5"/></svg>
+          <span>Выбор группы</span>
+          <svg class="app-row-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button class="app-row" data-page="settings" data-title="Настройки">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.1 14.5a1.6 1.6 0 0 0 .32 1.77l.06.06a1.94 1.94 0 1 1-2.74 2.74l-.06-.06a1.6 1.6 0 0 0-1.77-.32 1.6 1.6 0 0 0-.97 1.46v.17a1.94 1.94 0 0 1-3.88 0v-.09a1.6 1.6 0 0 0-1.04-1.46 1.6 1.6 0 0 0-1.77.32l-.06.06a1.94 1.94 0 1 1-2.74-2.74l.06-.06a1.6 1.6 0 0 0 .32-1.77 1.6 1.6 0 0 0-1.46-.97H3.1a1.94 1.94 0 0 1 0-3.88h.09a1.6 1.6 0 0 0 1.46-1.04 1.6 1.6 0 0 0-.32-1.77l-.06-.06A1.94 1.94 0 1 1 7.01 4.1l.06.06a1.6 1.6 0 0 0 1.77.32h.08a1.6 1.6 0 0 0 .97-1.46V3.1a1.94 1.94 0 0 1 3.88 0v.09a1.6 1.6 0 0 0 .97 1.46 1.6 1.6 0 0 0 1.77-.32l.06-.06a1.94 1.94 0 1 1 2.74 2.74l-.06.06a1.6 1.6 0 0 0-.32 1.77v.08a1.6 1.6 0 0 0 1.46.97h.17a1.94 1.94 0 0 1 0 3.88h-.09a1.6 1.6 0 0 0-1.46.97Z"/></svg>
+          <span>Настройки</span>
+          <svg class="app-row-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button class="app-row" data-page="about" data-title="О приложении">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+          <span>О приложении</span>
+          <svg class="app-row-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+      </div>
+    </section>
+    <section id="aboutPage" class="panel section-panel" hidden>
+      <div class="app-about">
+        <img src="img/icon-192.png" alt="" width="72" height="72">
+        <h2>Мой Герцена</h2>
+        <p>Расписание, сессия, группа и домашние задания Герценовского университета.</p>
+        <p class="app-about-meta">Версия 1.0 (7) · Moonbay Studio</p>
+      </div>
+      <div class="app-rows">
+        <a class="app-row" href="support/">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.2 2.4c-.5.2-.7.6-.7 1.1v.5M12 16.5h.01"/></svg>
+          <span>Поддержка</span>
+          <svg class="app-row-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </a>
+        <a class="app-row" href="terms/">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>
+          <span>Условия использования</span>
+          <svg class="app-row-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </a>
+        <a class="app-row" href="privacy/">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v6c0 4.2 2.9 7.9 7 9 4.1-1.1 7-4.8 7-9V6l-7-3Z"/></svg>
+          <span>Политика конфиденциальности</span>
+          <svg class="app-row-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </a>
+      </div>
+    </section>
+    <section id="schedulePage" class="panel section-panel">
+      <div class="app-empty" id="noGroupHint" hidden>
+        <p>Группа не выбрана.</p>
+        <button type="button" class="button primary" data-page="group" data-title="Выбор группы">Выбрать группу</button>
+      </div>
+      <p id="scheduleState" role="status" aria-live="polite"></p>
+      <div id="lessons" class="workspace-cards"></div>
+    </section>
+    <section id="groupPage" class="panel section-panel" hidden>
+      <div class="workspace-form" id="groupPicker">
+        <label>Институт<select id="facultySelect" aria-label="Институт"><option value="">Все институты</option></select></label>
+        <label>Поиск группы<input id="groupSearch" type="search" placeholder="Название группы" autocomplete="off"></label>
+        <label>Группа<select id="groupSelect"><option value="">Загрузка групп…</option></select></label>
+      </div>
+      <p class="form-actions-note">Выбранная здесь группа открывается в расписании и сессии. Время занятий — московское.</p>
+      <div class="app-rows">
+        <button class="app-row" id="setDefaultGroup">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 10 17l9-9"/></svg>
+          <span>Сделать основной группой аккаунта</span>
+        </button>
+      </div>
+      <p class="form-actions-note" id="defaultGroupLabel"></p>
+      <div id="groupMembers" class="workspace-cards"></div>
+    </section>
+    <section id="requestsPage" class="panel section-panel" hidden>
+      <form id="roleRequestForm" class="auth-form">
+        <label>Роль<select id="requestedRole"><option value="group_leader">Староста</option><option value="moderator">Модератор</option><option value="tester">Тестировщик</option><option value="plus">Plus</option><option value="premium">Premium</option></select></label>
+        <label>Комментарий<textarea id="requestComment" maxlength="1000"></textarea></label>
+        <button type="submit" class="button primary">Отправить заявку</button>
+      </form>
+      <h3>Заявки на роль</h3><div id="roleRequests" class="workspace-cards"></div>
+      <h3>Смена группы</h3><div id="groupRequests" class="workspace-cards"></div>
+    </section>
+    <section id="settingsPage" class="panel section-panel" hidden>
+      <div class="app-rows">
+        <button class="app-row" data-page="themes" data-title="Темы">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1 0 1.8-.8 1.8-1.8 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.1 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8Z"/><circle cx="7.5" cy="12" r="1.2"/><circle cx="10" cy="7.8" r="1.2"/><circle cx="15" cy="8.3" r="1.2"/></svg>
+          <span>Темы</span>
+          <svg class="app-row-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+        <button class="app-row" data-page="accessibility" data-title="Спец. возможности">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="4.6" r="1.8"/><path d="M4.5 8.2h15M12 8.6v5m0 0 3.2 6m-3.2-6-3.2 6"/></svg>
+          <span>Спец. возможности</span>
+          <svg class="app-row-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        </button>
+      </div>
+      <div class="app-options">
+        <div class="app-option">
+          <label class="app-option-head">
+            <input id="liveActivity" type="checkbox" class="app-check" checked>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8.5a6 6 0 1 0-12 0c0 6-2 7.5-2 7.5h16s-2-1.5-2-7.5Z"/><path d="M13.7 19.5a2 2 0 0 1-3.4 0"/></svg>
+            <span>Активные уведомления</span>
+          </label>
+          <p class="app-option-note">Фоновая шторка и Live Activities работают в приложениях для iPhone, iPad и Mac. Настройка синхронизируется с аккаунтом.</p>
+        </div>
+        <div class="app-option">
+          <div class="app-option-head is-static">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 18.5a4 4 0 0 1-.5-8 6 6 0 0 1 11.6-1.5A3.75 3.75 0 0 1 18 18.5Z"/></svg>
+            <span>Офлайн-режим расписания</span>
+          </div>
+          <div class="app-option-sub">
+            <label class="app-sub-row">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>
+              <span>Кэш расписания</span>
+              <select id="cacheWeeks" aria-label="Офлайн-кэш расписания"><option value="0">Выключен</option><option value="1">1 неделя</option><option value="2" selected>2 недели</option><option value="3">3 недели</option><option value="4">4 недели</option></select>
+            </label>
+            <button type="button" class="app-sub-row" id="clearCache">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4.5h-4.5"/></svg>
+              <span>Очистить офлайн-кэш</span>
+            </button>
+          </div>
+          <p class="app-option-note">Сохранённое расписание открывается без интернета. Настройка синхронизируется с аккаунтом.</p>
+        </div>
+      </div>
+      <p id="settingsState" role="status" aria-live="polite" class="app-option-note"></p>
+    </section>
+    <section id="themesPage" class="panel section-panel" hidden>
+      <div class="app-options">
+        <div class="app-option">
+          <label class="app-sub-row is-first">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v18"/></svg>
+            <span>Оформление</span>
+            <select id="webTheme" aria-label="Тема"><option value="system">Системная</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select>
+          </label>
+          <p class="app-option-note">Системная тема повторяет оформление операционной системы.</p>
+        </div>
+      </div>
+    </section>
+    <section id="accessibilityPage" class="panel section-panel" hidden>
+      <div class="app-options">
+        <div class="app-option">
+          <label class="app-option-head">
+            <input id="largerText" type="checkbox" class="app-check">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V5h9v2M8.5 5v14M6 19h5"/><path d="M14 12v-1.4h6V12M16.4 10.6V19M15 19h3"/></svg>
+            <span>Крупный текст</span>
+          </label>
+        </div>
+        <div class="app-option">
+          <label class="app-option-head">
+            <input id="highContrast" type="checkbox" class="app-check">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18Z" fill="currentColor" stroke="none"/></svg>
+            <span>Высокий контраст</span>
+          </label>
+        </div>
+        <div class="app-option">
+          <label class="app-option-head">
+            <input id="reduceMotion" type="checkbox" class="app-check">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h6M14 12h6M12 4v6M12 14v6"/></svg>
+            <span>Уменьшить движение</span>
+          </label>
+          <p class="app-option-note">Отключает анимации интерфейса.</p>
+        </div>
+      </div>
+    </section>
+    <section id="sessionsPage" class="panel section-panel" hidden>
+      <div class="app-rows">
+        <button class="app-row" id="logoutOthers">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h9"/><path d="m14 15 4-3-4-3M18 12H9"/></svg>
+          <span>Завершить другие сеансы</span>
+        </button>
+      </div>
+      <div id="sessions" class="workspace-cards"></div>
+    </section>
+    <section id="adminPage" class="panel section-panel" hidden>
+      <p>Права проверяются сервером для каждого действия.</p>
+      <label>Раздел<select id="adminSection"><option value="requests">Заявки на роли и группы</option><option value="users">Пользователи, роли и значки</option><option value="settings">Настройки сервиса</option><option value="notices">Объявления</option></select></label>
+      <button id="refreshAdmin" class="button secondary">Обновить</button><div id="adminContent" class="workspace-cards"></div>
+    </section>
+      </div>
+    </main>
+  </div>
+  <dialog id="confirmDialog"><form method="dialog"><h2>Подтверждение</h2><p id="confirmText"></p><button value="cancel" class="button secondary">Отмена</button><button value="confirm" class="button primary">Подтвердить</button></form></dialog>
+  <dialog id="noticeDialog" aria-labelledby="modalNoticeTitle"><h2 id="modalNoticeTitle"></h2><p id="modalNoticeText"></p><button id="closeModalNotice" class="button secondary">Закрыть</button></dialog>
+  <script src="auth.js?v=20260924-desktop"></script><script src="nav.js?v=20260924-desktop"></script>
+  <script src="client-core.js?v=20260924-desktop"></script><script src="workspace.js?v=20260924-desktop"></script>
+</body>
+</html>

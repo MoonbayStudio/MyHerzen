@@ -1,0 +1,247 @@
+.workspace { padding-top: 28px; padding-bottom: 60px; }
+.workspace-tabs, .workspace-form { display: flex; gap: 12px; flex-wrap: wrap; margin: 24px 0; }
+.workspace-tabs .button { flex: 1 1 120px; }
+.workspace-form label { flex: 1 1 180px; }
+.workspace label { display: grid; gap: 8px; margin: 10px 0; }
+.workspace input, .workspace select, .workspace textarea, dialog input, dialog textarea, dialog select { box-sizing: border-box; width: 100%; max-width: 100%; min-height: 44px; padding: 10px; border: 1px solid #737e99; border-radius: 10px; background: #131c31; color: #f5f7ff; font: inherit; }
+.workspace select option { background: #131c31; color: #fff; }
+.workspace textarea { min-height: 95px; }
+.workspace .checkbox-label { display: flex; gap: 10px; align-items: center; }
+.workspace input[type=checkbox] { width: 24px; min-height: 24px; flex-shrink: 0; }
+.workspace-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 16px; margin: 24px 0; }
+.workspace-card { padding: 20px; border: 1px solid #485574; border-radius: 18px; background: rgba(85,105,150,.1); overflow-wrap: anywhere; }
+.workspace-card h3 { margin: 6px 0 12px; }
+.workspace-card .button { margin: 8px 8px 0 0; }
+.workspace-card p, .workspace-card pre { white-space: pre-wrap; font: inherit; }
+.workspace [hidden], .workspace-tabs [hidden] { display: none !important; }
+.workspace :focus-visible, dialog :focus-visible { outline: 3px solid #9dbcff; outline-offset: 3px; }
+dialog { background: #101829; color: #fff; border: 1px solid #7183aa; border-radius: 18px; width: min(520px, calc(100% - 40px)); padding: 24px; }
+dialog::backdrop { background: rgba(0,0,0,.65); }
+body[data-web-theme=light] { --text: #17264c; --muted: #4c5b7b; --border: #b5c0d8; --danger: #9e2140; background: #f5f7fc; color: #17264c; }
+body[data-web-theme=light] .workspace .button.primary { background: #264796; color: #fff; }
+body[data-web-theme=light] .workspace .button.secondary, body[data-web-theme=light] .nav-pill { background: #e3e9f5; color: #17264c; }
+body[data-web-theme=light] .workspace :focus-visible { outline-color: #264796; }
+body[data-web-theme=light] .workspace label { color: #17264c; }
+body[data-web-theme=light] .workspace input::placeholder, body[data-web-theme=light] .workspace textarea::placeholder { color: #53627d; }
+body[data-web-theme=light] .panel, body[data-web-theme=light] .workspace-card { background: #fff; color: #17264c; }
+body[data-web-theme=light] .workspace input, body[data-web-theme=light] .workspace select, body[data-web-theme=light] .workspace textarea { background: #fff; color: #17264c; }
+body[data-large-text=true] .workspace { font-size: 120%; }
+body[data-high-contrast=true] .workspace-card, body[data-high-contrast=true] .panel { border: 2px solid currentColor; }
+body[data-reduce-motion=true] *, body[data-reduce-motion=true] *::before, body[data-reduce-motion=true] *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+@media (prefers-reduced-motion: reduce) { .workspace *, dialog { animation: none !important; transition: none !important; } }
+
+
+/* ===== Application shell: modelled on the native macOS client ===== */
+.app-shell {
+  --app-bg: #161618;
+  --app-sidebar: #1c1c1e;
+  --app-card: #2c2c2e;
+  --app-card-strong: #3a3a3c;
+  --app-field: #202022;
+  --app-text: #f5f5f7;
+  --app-muted: #9a9aa0;
+  --app-accent: #0a84ff;
+  --app-line: rgba(255, 255, 255, .09);
+  display: grid;
+  grid-template-columns: 208px minmax(0, 1fr);
+  /* The sidebar stays put and only the content scrolls, the way a desktop app behaves. */
+  height: 100vh;
+  overflow: hidden;
+  background: var(--app-bg);
+  color: var(--app-text);
+}
+
+.app-sidebar { display: flex; flex-direction: column; gap: 6px; padding: 14px 10px; overflow-y: auto; border-right: 1px solid var(--app-line); background: var(--app-sidebar); }
+.app-sidebar-brand { display: flex; align-items: center; gap: 9px; padding: 6px 8px 18px; font-size: 14px; font-weight: 700; }
+.app-sidebar-brand img { width: 26px; height: 26px; border-radius: 8px; }
+.app-sidebar-nav { display: flex; flex-direction: column; gap: 6px; }
+.app-sidebar-footer { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--app-line); }
+
+.app-nav-item { display: flex; align-items: center; gap: 11px; width: 100%; padding: 11px 12px; border: none; border-radius: 8px; background: transparent; color: var(--app-text); font: inherit; font-size: 13.5px; font-weight: 500; text-align: left; text-decoration: none; cursor: pointer; }
+/* Icons keep the system accent in every state, as they do in the native client. */
+.app-nav-item svg { width: 18px; height: 18px; flex-shrink: 0; fill: none; stroke: var(--app-accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.app-nav-item:hover { background: rgba(255, 255, 255, .07); }
+/* workspace.js marks the open section with .primary and the rest with .secondary. */
+.app-nav-item.primary, .app-nav-item[aria-current=page] { background: rgba(255, 255, 255, .14); color: #fff; font-weight: 600; }
+.app-nav-item.secondary { background: transparent; border: none; color: var(--app-text); }
+.app-nav-item.secondary:hover { background: rgba(255, 255, 255, .07); }
+
+.app-account { display: flex; align-items: center; gap: 4px; padding: 4px; border-radius: 10px; }
+.app-account:hover { background: rgba(255, 255, 255, .05); }
+.app-account-link { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; padding: 4px; border: none; border-radius: 8px; background: transparent; color: var(--app-text); font: inherit; text-align: left; text-decoration: none; cursor: pointer; }
+/* workspace.js paints anything with data-page; the account block stays neutral. */
+.app-account-link.primary, .app-account-link.secondary { background: transparent; border: none; color: var(--app-text); }
+.app-account:has(.app-account-link.primary) { background: rgba(255, 255, 255, .12); }
+.app-account-avatar { display: grid; place-items: center; width: 27px; height: 27px; flex-shrink: 0; border-radius: 8px; background: var(--app-accent); color: #fff; font-size: 13px; font-weight: 700; }
+.app-account-text { display: grid; min-width: 0; }
+.app-account-text strong { font-size: 12.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-account-text small { font-size: 11px; color: var(--app-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-account-settings { display: grid; place-items: center; width: 30px; height: 30px; flex-shrink: 0; padding: 0; border: none; border-radius: 8px; background: transparent; color: var(--app-muted); cursor: pointer; }
+.app-account-settings svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; }
+.app-account-settings:hover { background: rgba(255, 255, 255, .1); color: var(--app-text); }
+.app-account-settings.primary, .app-account-settings[aria-current=page] { background: rgba(255, 255, 255, .16); color: #fff; }
+.app-account-settings.secondary { background: transparent; border: none; color: var(--app-muted); }
+
+/* <main> also carries .workspace, whose page padding does not belong in the shell. */
+.app-main.workspace { display: flex; flex-direction: column; min-width: 0; padding-top: 0; padding-bottom: 0; overflow-y: auto; }
+.app-topbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; padding: 14px 20px 12px; background: var(--app-bg); }
+/* Section name sits in a pill, matching the macOS title chip. */
+.app-topbar h1 { display: inline-flex; margin: 0; padding: 8px 16px; border-radius: 10px; background: var(--app-card); font-size: 13.5px; font-weight: 600; }
+.app-content { flex: 1; min-width: 0; padding: 0 20px 28px; }
+.app-content .panel, .app-content .section-panel { padding: 0; border: none; background: none; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.app-content #systemNotice { padding: 16px 18px; border-radius: 12px; background: var(--app-card); }
+.app-content h3 { margin: 22px 0 10px; font-size: 14px; }
+.app-content .form-actions-note, .app-content #scheduleState { color: var(--app-muted); font-size: 13px; }
+
+.app-content .workspace-form { align-items: end; gap: 12px; margin: 0 0 16px; padding: 16px 18px; border-radius: 12px; background: var(--app-card); }
+.app-content .workspace-form .button { flex: 0 0 auto; height: 44px; }
+.app-shell .workspace label { margin: 0; }
+.app-shell .workspace label { color: var(--app-muted); font-size: 12px; font-weight: 500; }
+.app-shell .workspace input, .app-shell .workspace select, .app-shell .workspace textarea { border: 1px solid rgba(255, 255, 255, .12); border-radius: 9px; background: var(--app-field); color: var(--app-text); font-size: 13.5px; }
+/* WebKitGTK draws native selects with the system theme, which stays light on a dark app.
+   Removing the native appearance and supplying our own arrow keeps Linux consistent. */
+.app-shell .workspace select {
+  -webkit-appearance: none;
+  appearance: none;
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239a9aa0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 16px 16px;
+}
+.app-shell .workspace input[type=date] { -webkit-appearance: none; appearance: none; }
+body[data-web-theme=light] .app-shell .workspace select { background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236a6a70' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); }
+.app-shell .workspace select option { background: var(--app-field); }
+.app-content .button { border-radius: 9px; font-size: 13.5px; }
+.app-content .button.primary { background: var(--app-accent); color: #fff; }
+.app-content .button.secondary { border: none; background: var(--app-card-strong); color: var(--app-text); }
+
+.app-content .workspace-cards { grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 0; }
+.app-content .workspace-card { padding: 16px 18px; border: none; border-radius: 12px; background: var(--app-card); }
+.app-content .workspace-card h3 { margin: 0 0 10px; font-size: 15px; }
+.lesson-card .lesson-time { margin: 0 0 4px; color: var(--app-muted); font-size: 13px; font-weight: 600; }
+.lesson-card h3 { margin: 0 0 12px; font-size: 15.5px; }
+.lesson-meta-row { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; color: var(--app-muted); font-size: 13px; }
+.lesson-meta-row svg { width: 15px; height: 15px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+@media (max-width: 860px) {
+  .app-shell { grid-template-columns: minmax(0, 1fr); height: auto; overflow: visible; }
+  .app-main { overflow-y: visible; }
+  .app-sidebar { flex-direction: row; align-items: center; gap: 4px; overflow-x: auto; padding: 8px 10px; border-right: none; border-bottom: 1px solid var(--app-line); }
+  .app-sidebar-brand { display: none; }
+  .app-sidebar-nav { flex-direction: row; gap: 4px; }
+  .app-sidebar-footer { margin: 0 0 0 auto; padding: 0; border: none; }
+  .app-account-text { display: none; }
+  .app-nav-item span { display: none; }
+  .app-nav-item.primary span, .app-nav-item[aria-current=page] span { display: inline; }
+  .app-topbar { padding: 12px 14px 8px; }
+  .app-content { padding: 0 14px 24px; }
+}
+
+body[data-web-theme=light] .app-shell {
+  --app-bg: #f2f2f7;
+  --app-sidebar: #fafafd;
+  --app-card: #fff;
+  --app-card-strong: #e6e6ec;
+  --app-field: #fff;
+  --app-text: #17181c;
+  --app-muted: #6a6a70;
+  --app-accent: #0a6ce8;
+  --app-line: rgba(0, 0, 0, .1);
+}
+body[data-web-theme=light] .app-nav-item:hover, body[data-web-theme=light] .app-account:hover { background: rgba(0, 0, 0, .05); }
+body[data-web-theme=light] .app-nav-item.primary, body[data-web-theme=light] .app-nav-item[aria-current=page] { background: rgba(0, 0, 0, .09); color: #000; }
+body[data-web-theme=light] .app-content .workspace-card, body[data-web-theme=light] .app-content .workspace-form { box-shadow: 0 1px 3px rgba(0, 0, 0, .07); }
+
+/* Menu and About: stacked rows with a leading icon and a chevron, as in the native client. */
+.app-rows { display: flex; flex-direction: column; gap: 10px; }
+.app-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 15px 16px; border: none; border-radius: 11px; background: var(--app-card); color: var(--app-text); font: inherit; font-size: 14px; font-weight: 500; text-align: left; text-decoration: none; cursor: pointer; }
+.app-row > svg:first-child { width: 19px; height: 19px; flex-shrink: 0; fill: none; stroke: var(--app-accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.app-row span { flex: 1; min-width: 0; }
+.app-row-chevron { width: 17px; height: 17px; flex-shrink: 0; fill: none; stroke: var(--app-muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.app-row:hover { background: var(--app-card-strong); }
+/* Rows carry data-page, so workspace.js paints them primary/secondary — keep both neutral. */
+.app-row.primary, .app-row.secondary { background: var(--app-card); color: var(--app-text); border: none; }
+.app-row.primary:hover, .app-row.secondary:hover { background: var(--app-card-strong); }
+
+.app-about { padding: 26px 18px 22px; margin-bottom: 16px; border-radius: 12px; background: var(--app-card); text-align: center; }
+.app-about img { border-radius: 16px; }
+.app-about h2 { margin: 12px 0 6px; font-size: 18px; }
+.app-about p { margin: 0 auto; max-width: 42ch; color: var(--app-muted); font-size: 13.5px; line-height: 1.5; }
+.app-about-meta { margin-top: 10px !important; font-size: 12.5px; }
+
+/* Account section: profile card with role badges. */
+.app-profile { display: flex; align-items: center; gap: 14px; padding: 16px 18px; margin-bottom: 16px; border-radius: 12px; background: var(--app-card); }
+.app-profile-avatar { display: grid; place-items: center; width: 44px; height: 44px; flex-shrink: 0; border-radius: 12px; background: var(--app-accent); color: #fff; font-size: 18px; font-weight: 700; }
+.app-profile-text { display: grid; gap: 7px; min-width: 0; }
+.app-profile-text strong { font-size: 15px; }
+.app-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.app-badge { padding: 3px 9px; border-radius: 999px; background: rgba(255, 255, 255, .12); color: var(--app-text); font-size: 11.5px; font-weight: 600; }
+.app-badge.is-group { background: rgba(10, 132, 255, .22); color: #8cc2ff; }
+body[data-web-theme=light] .app-badge { background: rgba(0, 0, 0, .08); }
+body[data-web-theme=light] .app-badge.is-group { background: rgba(10, 108, 232, .14); color: #0a55b5; }
+
+/* Top bar actions: refresh and date, mirroring the native schedule header. */
+.app-topbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.app-icon-button { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: none; border-radius: 10px; background: var(--app-card); color: var(--app-text); cursor: pointer; }
+.app-icon-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.app-icon-button:hover { background: var(--app-card-strong); }
+/* .workspace label is a grid by default; the date chip has to stay a row. */
+.app-shell .workspace label.app-date-button { display: flex; align-items: center; gap: 8px; height: 36px; margin: 0; padding: 0 12px; border-radius: 10px; background: var(--app-card); color: var(--app-text); }
+.app-date-button svg { width: 17px; height: 17px; flex-shrink: 0; fill: none; stroke: var(--app-muted); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.app-shell .workspace .app-date-button input[type=date] { width: auto; min-height: 0; padding: 0; border: none; background: none; color: var(--app-text); font-size: 13.5px; font-weight: 600; }
+.app-date-button:hover { background: var(--app-card-strong); }
+
+/* Schedule with no group selected. */
+.app-empty { padding: 34px 20px; border-radius: 12px; background: var(--app-card); text-align: center; }
+.app-empty p { margin: 0 0 16px; color: var(--app-muted); font-size: 14px; }
+
+/* Group picker lives in its own section now, so it needs no submit button. */
+#groupPicker { align-items: end; }
+
+/* Back control sits left of the section title in nested sections. */
+.app-back { flex-shrink: 0; }
+.app-back svg { stroke-width: 2.1; }
+
+/* Settings options: card per setting, like the native client. */
+.app-options { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.app-option { padding: 14px 16px; border-radius: 12px; background: var(--app-card); }
+/* .workspace label defaults to a grid, so these rows need the extra specificity. */
+.app-shell .workspace .app-option-head { display: flex; align-items: center; gap: 11px; margin: 0; font-size: 14px; font-weight: 600; color: var(--app-text); cursor: pointer; }
+.app-option-head.is-static { cursor: default; }
+.app-option-head > svg { width: 18px; height: 18px; flex-shrink: 0; fill: none; stroke: var(--app-accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.app-option-note { margin: 8px 0 0; color: var(--app-muted); font-size: 12.5px; line-height: 1.45; }
+
+/* Round checkbox with a tick, replacing the default square. */
+.app-shell .workspace input.app-check {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 21px;
+  height: 21px;
+  min-height: 21px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1.6px solid var(--app-muted);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+}
+.app-shell .workspace input.app-check:checked {
+  border-color: var(--app-accent);
+  background-color: var(--app-accent);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12.5 4.5 4.5L19 7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 13px 13px;
+}
+.app-shell .workspace input.app-check:hover { border-color: var(--app-accent); }
+
+/* Nested rows inside an option card. */
+.app-option-sub { margin-top: 12px; border-top: 1px solid var(--app-line); }
+.app-shell .workspace .app-sub-row { display: flex; align-items: center; gap: 10px; width: 100%; margin: 0; padding: 11px 0; border: none; border-bottom: 1px solid var(--app-line); background: none; color: var(--app-text); font: inherit; font-size: 13.5px; font-weight: 500; text-align: left; cursor: pointer; }
+.app-shell .workspace .app-sub-row:last-child { border-bottom: none; }
+.app-shell .workspace .app-sub-row.is-first { padding-top: 0; }
+.app-sub-row > svg { width: 17px; height: 17px; flex-shrink: 0; fill: none; stroke: var(--app-accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.app-sub-row > span { flex: 1; min-width: 0; }
+.app-shell .workspace .app-sub-row select { width: auto; min-width: 150px; min-height: 34px; padding: 0 32px 0 10px; font-size: 13px; }
