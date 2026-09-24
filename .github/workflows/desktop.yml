@@ -1,7 +1,10 @@
-# Desktop shells for Windows and Linux. Run manually; nothing is published automatically.
+# Desktop shells for Windows and Linux. Bundles stay as CI artifacts; nothing is published automatically.
 name: desktop
 
 on:
+  push:
+    branches:
+      - codex/myherzen-desktop
   workflow_dispatch:
 
 jobs:
